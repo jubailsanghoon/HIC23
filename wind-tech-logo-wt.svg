@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+  <rect width="1000" height="1000" fill="#ffffff"/>
+  <defs>
+    <!--
+      Variant 2: W + T + C Tightly Follows the Reference 'i-s-k' Silhouette
+      - Top-Left Square (T-left / Wind node)
+      - Left Vertical Stem + Bottom-Right Angled W-Valley + Diagonal T/C Wing
+      - Bottom-Right Detached Angled Block
+    -->
+    <g id="wt-silhouette-shapes">
+      <!-- 1. Top-Left Detached Square -->
+      <polygon points="115,105 265,105 265,255 115,255" />
+
+      <!-- 2. Central Monogram ('W' + 'T' + 'C' in the exact proportions of the reference logo) -->
+      <polygon points="
+        115,295
+        265,295
+        265,715
+        465,715
+        515,665
+        280,430
+        605,105
+        885,105
+        765,225
+        655,225
+        450,430
+        715,695
+        540,870
+        115,870
+      " />
+
+      <!-- 3. Top-Right / Mid-Right Detached T-Bar / C-Terminal Block -->
+      <polygon points="735,645 905,815 795,925 625,755" />
+    </g>
+  </defs>
+
+  <!-- Outer Black Outline -->
+  <use href="#wt-silhouette-shapes" fill="none" stroke="#000000" stroke-width="28" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- Middle White Gap Outline -->
+  <use href="#wt-silhouette-shapes" fill="none" stroke="#ffffff" stroke-width="16" stroke-linejoin="miter" stroke-miterlimit="6"/>
+  <!-- Inner Black Outline + Cobalt Blue Fill -->
+  <use href="#wt-silhouette-shapes" fill="#0068d6" stroke="#000000" stroke-width="6" stroke-linejoin="miter" stroke-miterlimit="6"/>
+</svg>

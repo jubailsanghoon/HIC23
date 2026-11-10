@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+  <rect width="1000" height="1000" fill="#ffffff"/>
+  <defs>
+    <!--
+      Wind Tech Consulting (WTC) Geometric Monogram
+      Designed in the exact visual language of the ISK reference logo:
+      - Piece 1 (Top-Left Square Accent / Left 'T' Wing): Detached square block (like the 'i' dot)
+      - Piece 2 (Central Interlocking 'W' + 'T' + 'C' Angular Monogram): Vertical & 45-degree geometric bars
+      - Piece 3 (Bottom-Right Detached Angled Block): Detached 45-degree diamond/rectangle completing the 'C' / 'W' wing
+    -->
+    <g id="wtc-shapes">
+      <!-- 1. Top-Left Detached Square Block (forming left arm of T / top of W) -->
+      <polygon points="115,105 265,105 265,255 115,255" />
+
+      <!-- 2. Main Interlocking W + T + C Geometric Body -->
+      <polygon points="
+        305,105
+        855,105
+        735,225
+        595,225
+        595,415
+        725,285
+        830,390
+        620,600
+        830,810
+        650,810
+        490,650
+        345,795
+        115,795
+        115,295
+        265,295
+        265,655
+        325,655
+        445,535
+        445,225
+        305,225
+      " />
+
+      <!-- 3. Detached Bottom-Right 45-Degree Block (mirroring the reference's detached lower-right block) -->
+      <polygon points="755,645 910,800 800,910 645,755" />
+    </g>
+  </defs>
+
+  <!-- Outer Black Outline -->
+  <use href="#wtc-shapes" fill="none" stroke="#000000" stroke-width="28" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- Middle White Gap Outline -->
+  <use href="#wtc-shapes" fill="none" stroke="#ffffff" stroke-width="16" stroke-linejoin="miter" stroke-miterlimit="6"/>
+  <!-- Inner Black Outline + Cobalt Blue Fill -->
+  <use href="#wtc-shapes" fill="#0068d6" stroke="#000000" stroke-width="6" stroke-linejoin="miter" stroke-miterlimit="6"/>
+</svg>

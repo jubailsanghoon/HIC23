@@ -1,0 +1,30 @@
+{
+  "name": "HeatInPut Calculator",
+  "short_name": "HeatInPut Calculator",
+  "description": "Welding Heat Input Calculator v2.3 (Offline-Ready)",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#ff7f00",
+  "icons": [
+    {
+      "src": "hi-logo.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "hi-logo.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "hi-logo.png",
+      "sizes": "338x355",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

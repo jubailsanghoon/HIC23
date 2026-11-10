@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#ff7f00" />
+    <meta name="application-name" content="HeatInPut Calculator" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="HeatInPut Calculator" />
+    <link id="appManifestLink" rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="hi-logo.svg" />
+    <link rel="icon" type="image/png" href="hi-logo.png" />
+    <link rel="apple-touch-icon" href="hi-logo.png" />
+    <title>Heat Input Calculator Pro 2.3</title>
+    <script>
+        // 카카오톡 인앱 브라우저 감지 시 강제 기본 브라우저(크롬/삼성인터넷/사파리) 탈출 및 바로가기 유도
+        (function() {
+            try {
+                var ua = navigator.userAgent.toLowerCase();
+                if (ua.indexOf('kakaotalk') !== -1) {
+                    var currentUrl = window.location.href;
+                    if (/iphone|ipad|ipod/i.test(ua)) {
+                        // iOS: 카카오 외부 브라우저 오픈 스킴 시도 후 사파리 모드 플래그 활성화
+                        window.__IS_KAKAO_INAPP_IOS = true;
+                        try {
+                            window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(currentUrl);
+                        } catch (err) {}
+                    } else {
+                        // Android: Chrome Intent 강제 호출 (카카오톡 창을 닫고 기본 Chrome 브라우저로 강제 점프)
+                        var cleanUrl = currentUrl.replace(/^https?:\/\//i, '');
+                        location.href = 'intent://' + cleanUrl + '#Intent;scheme=https;package=com.android.chrome;end';
+                        return;
+                    }
+                }
+            } catch (e) {}
+        })();
+        window.__deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            window.__deferredInstallPrompt = e;
+            if (typeof MainController !== 'undefined') {
+                MainController._deferredInstallPrompt = e;
+            }
+        });
+        (function(){
+            try {
+                var img = new Image();
+                img.onload = function() {
+                    try {
+                        var makePng = function(sz) {
+                            var c = document.createElement('canvas');
+                            c.width = sz; c.height = sz;
+                            c.getContext('2d').drawImage(img, 0, 0, sz, sz);
+                            return c.toDataURL('image/png');
+                        };
+                        var icon192 = makePng(192);
+                        var icon512 = makePng(512);
+                        if ('caches' in window && (location.protocol === 'https:' || location.protocol === 'http:')) {
+                            caches.open('hi-calc-pro-v23-offline-v5').then(function(cache) {
+                                fetch(icon192).then(function(r) { cache.put('./icon-192.png', r); }).catch(function(){});
+                                fetch(icon512).then(function(r) { cache.put('./icon-512.png', r); }).catch(function(){});
+                            }).catch(function(){});
+                        }
+                    } catch (err) {}
+                };
+                img.src = 'hi-logo.png';
+            } catch (e) {}
+            try {
+                var saved = localStorage.getItem('HI_DARK_MODE');
+                var root = document.documentElement;
+                if (saved === 'true') {
+                    root.classList.add('dark');
+                    root.style.setProperty('color-scheme', 'dark', 'important');
+                } else {
+                    root.classList.remove('dark');
+                    root.style.setProperty('color-scheme', 'light', 'important');
+                }
+            } catch(e){}
+        })();
+    </script>
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+    <header class="top-header">
+        <div class="header-inner">
+            <div class="brand-wrap" onclick="MainController.showMainView()" style="cursor:pointer;">
+                <div class="app-logo-box">
+                    <img src="hi-logo.png" alt="HI Logo" />
+                </div>
+                <div class="brand-text">
+                    <h1>Heat Input Calculator</h1>
+                    <div class="version-row">
+                        <span class="ver-txt">v2.3</span>
+                        <span id="proBadge" class="pro-badge" style="background-color:#868e96; cursor:pointer;" onclick="event.stopPropagation(); MainController.openModal('pages/settings.html');" title="PRO 인증 설정">FREE 버전</span>
+                        <span id="netStatusBadge" class="net-badge online" style="cursor:pointer;" onclick="event.stopPropagation(); MainController.handleNetBadgeClick();">🟢 온라인</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <button class="hdr-btn" onclick="MainController.toggleDarkMode()" title="다크모드 전환">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+                </button>
+                <div class="lang-pill">
+                    <svg viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                    <select id="langSelect" onchange="MainController.changeLanguage(this.value)">
+                        <option value="ko">KO</option>
+                        <option value="en">EN</option>
+                        <option value="es">ES</option>
+                        <option value="zh">ZH</option>
+                        <option value="ja">JA</option>
+                    </select>
+                </div>
+                <button class="hdr-btn" onclick="MainController.openModal('pages/dashboard.html')" title="도움말 및 규격 매뉴얼">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="orange-divider"></div>
+    </header>
+
+    <!-- 카카오톡 인앱 브라우저 감지 시 전체화면 강제 탈출 유도 모달 오버레이 -->
+    <div id="kakaoInAppOverlay" class="hidden" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; justify-content:center; align-items:center; padding:20px; box-sizing:border-box;">
+        <div style="background:#fff; border-radius:18px; max-width:380px; width:100%; padding:24px; text-align:center; box-shadow:0 12px 32px rgba(0,0,0,0.4); position:relative;">
+            <div style="font-size:36px; margin-bottom:10px;">📲</div>
+            <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:900; color:#191919;">기본 브라우저로 열기 안내</h3>
+            <p style="font-size:13px; color:#495057; line-height:1.55; margin:0 0 18px 0;">
+                현재 <strong>카카오톡 내부 화면</strong>에서는 보안 정책상 <span style="color:#ff7f00; font-weight:800;">[홈화면에 바로가기 추가]</span> 및 오프라인 저장이 제한됩니다.<br><br>
+                아래 버튼을 눌러 <strong>기본 브라우저(Chrome / Safari)</strong>로 열어주세요!
+            </p>
+            <button type="button" onclick="MainController.escapeKakaoInApp()" style="width:100%; padding:14px; background:#ff7f00; color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:900; cursor:pointer; margin-bottom:10px; box-shadow:0 4px 12px rgba(255,127,0,0.35);">
+                🚀 기본 브라우저로 열기 (Chrome/Safari)
+            </button>
+            <button type="button" onclick="document.getElementById('kakaoInAppOverlay').style.display='none'" style="background:none; border:none; color:#868e96; font-size:12px; font-weight:700; cursor:pointer; text-decoration:underline;">
+                그냥 여기서 계속 보기
+            </button>
+        </div>
+    </div>
+
+    <!-- 카카오톡 인앱 브라우저 상단 고정 띠 배너 -->
+    <div id="kakaoInAppBanner" class="hidden" style="background:#fee500; border-bottom:2px solid #e6cf00; padding:12px 16px; font-size:12.5px; font-weight:800; color:#191919; display:none; justify-content:space-between; align-items:center; gap:8px;">
+        <div style="flex:1; line-height:1.45;">
+            💡 <strong>카카오톡 내부 브라우저로 접속 중입니다.</strong><br>
+            홈화면 바로가기 추가 및 오프라인 저장을 위해 <strong>[기본 브라우저(크롬/사파리)]</strong>로 열어주세요.
+        </div>
+        <button type="button" onclick="MainController.escapeKakaoInApp()" style="background:#191919; color:#fff; border:none; border-radius:6px; padding:8px 12px; font-size:12px; font-weight:900; cursor:pointer; white-space:nowrap;">
+            브라우저로 열기 ↗
+        </button>
+    </div>
+
+    <div style="padding: 0 20px;">
+        <div id="offlineToastBanner" class="sync-toast-banner hidden">
+            <span id="offlineToastMsg"></span>
+            <button type="button" style="background:none; border:none; color:inherit; font-weight:900; cursor:pointer; font-size:14px;" onclick="document.getElementById('offlineToastBanner').classList.add('hidden')">✕</button>
+        </div>
+    </div>
+
+    <!-- 모달 오버레이 -->
+    <div id="subPageModal" class="subpage-overlay hidden">
+        <div class="subpage-card">
+            <div class="subpage-header">
+                <strong id="subPageTitle">Sub View</strong>
+                <button class="close-sub-btn" onclick="MainController.closeModal()" data-i18n="btn_close">✕ 닫기</button>
+            </div>
+            <div id="subPageBody"></div>
+        </div>
+    </div>
+
+    <input type="file" id="hiddenFileInput" class="hidden" accept=".txt,.json" onchange="PresetManager.handleFileImport(event)" />
+    <input type="file" id="hiddenPdfInput" class="hidden" accept=".pdf" onchange="PresetManager.handlePdfImport(event)" />
+
+    <main class="main-container">
+
+        <div class="top-two-col">
+            <section class="outline-card">
+                <div class="small-label" data-i18n="lbl_standard">규격</div>
+                <div class="std-toggle-group">
+                    <button type="button" id="btnStdAWS" class="std-btn" onclick="Calculator.setStandard('AWS')">AWS</button>
+                    <button type="button" id="btnStdISO" class="std-btn active" onclick="Calculator.setStandard('ISO')">ISO</button>
+                </div>
+            </section>
+            <section class="outline-card">
+                <div class="small-label" data-i18n="lbl_process">용접 공정</div>
+                <div class="process-select-wrap">
+                    <select id="selProcess" onchange="Calculator.calculate()">
+                        <option value="FCAW">FCAW</option>
+                        <option value="GMAW">GMAW</option>
+                        <option value="SMAW">SMAW</option>
+                        <option value="GTAW">GTAW</option>
+                        <option value="SAW">SAW</option>
+                    </select>
+                </div>
+            </section>
+        </div>
+
+        <!-- WPS 모드 -->
+        <section class="outline-card">
+            <div class="card-header-row">
+                <h2 class="card-title" data-i18n="title_wps_mode">WPS 모드</h2>
+                <div class="mode-pill-group">
+                    <button type="button" id="btnWpsManual" class="mode-pill active" onclick="Calculator.setWpsMode('manual')" data-i18n="btn_manual">수동</button>
+                    <button type="button" id="btnWpsPreset" class="mode-pill" onclick="Calculator.setWpsMode('preset')" data-i18n="btn_preset">프리셋</button>
+                </div>
+            </div>
+
+            <div id="wpsManualView">
+                <div class="field-label" data-i18n="lbl_wps_no">WPS 번호</div>
+                <input type="text" id="inpWpsNo" class="full-input" placeholder="e.g. WPS-001" oninput="Calculator.calculate()" />
+            </div>
+
+            <div id="wpsPresetView" class="hidden">
+                <button type="button" class="preset-list-bar" onclick="PresetManager.openViewer('wps')">
+                    📄 <span id="wpsCountLbl">목록 보기 (0/300)</span>
+                </button>
+                <div class="preset-action-bar">
+                    <button type="button" class="preset-sub-btn" onclick="PresetManager.openEditor('wps')" data-i18n="btn_edit">편집</button>
+                    <button type="button" class="preset-sub-btn" onclick="PresetManager.downloadSample('wps')" data-i18n="btn_sample">⬇ 샘플</button>
+                    <button type="button" class="preset-sub-btn btn-green" onclick="PresetManager.exportBackup('wps')" data-i18n="btn_backup">⬇ 백업</button>
+                    <button type="button" class="preset-sub-btn" onclick="PresetManager.triggerImport('wps')" data-i18n="btn_upload">⬆ 업로드</button>
+                    <button type="button" class="preset-sub-btn btn-orange" onclick="PresetManager.triggerPdfImport('wps')" data-i18n="btn_pdf">PDF</button>
+                </div>
+                <div id="wpsStepContainer" class="wps-step-box"></div>
+            </div>
+
+            <div class="two-col-grid mt-12">
+                <div class="stepper-box">
+                    <div class="stepper-info">
+                        <span class="sub-lbl" data-i18n="lbl_min">최소</span>
+                        <input type="number" id="inpWpsMin" value="1.00" step="0.01" oninput="Calculator.calculate()" />
+                    </div>
+                    <div class="stepper-btns">
+                        <button type="button" onclick="Calculator.stepValue('inpWpsMin', 0.05)">+</button>
+                        <button type="button" onclick="Calculator.stepValue('inpWpsMin', -0.05)">-</button>
+                    </div>
+                </div>
+                <div class="stepper-box">
+                    <div class="stepper-info">
+                        <span class="sub-lbl" data-i18n="lbl_max">최대</span>
+                        <input type="number" id="inpWpsMax" value="1.66" step="0.01" oninput="Calculator.calculate()" />
+                    </div>
+                    <div class="stepper-btns">
+                        <button type="button" onclick="Calculator.stepValue('inpWpsMax', 0.05)">+</button>
+                        <button type="button" onclick="Calculator.stepValue('inpWpsMax', -0.05)">-</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 데이터 입력 -->
+        <section class="outline-card">
+            <h2 class="card-title mb-14" data-i18n="title_data_input">데이터 입력</h2>
+            <div class="two-col-grid">
+                <div class="stepper-box with-icon">
+                    <div class="input-icon-box">V</div>
+                    <div class="stepper-info">
+                        <span class="sub-lbl" data-i18n="lbl_voltage">전압 (V)</span>
+                        <input type="number" id="inpVoltage" value="30.0" step="0.5" oninput="Calculator.calculate()" />
+                    </div>
+                    <div class="stepper-btns">
+                        <button type="button" onclick="Calculator.stepValue('inpVoltage', 0.5)">+</button>
+                        <button type="button" onclick="Calculator.stepValue('inpVoltage', -0.5)">-</button>
+                    </div>
+                </div>
+                <div class="stepper-box with-icon">
+                    <div class="input-icon-box">A</div>
+                    <div class="stepper-info">
+                        <span class="sub-lbl" data-i18n="lbl_amperage">암페어 (A)</span>
+                        <input type="number" id="inpAmperage" value="300.0" step="1" oninput="Calculator.calculate()" />
+                    </div>
+                    <div class="stepper-btns">
+                        <button type="button" onclick="Calculator.stepValue('inpAmperage', 5)">+</button>
+                        <button type="button" onclick="Calculator.stepValue('inpAmperage', -5)">-</button>
+                    </div>
+                </div>
+                <div class="stepper-box with-icon">
+                    <div class="input-icon-box">L</div>
+                    <div class="stepper-info">
+                        <span class="sub-lbl" data-i18n="lbl_length">길이 (MM)</span>
+                        <input type="number" id="inpLength" value="5.0" step="1" oninput="Calculator.calculate()" />
+                    </div>
+                    <div class="stepper-btns">
+                        <button type="button" onclick="Calculator.stepValue('inpLength', 1)">+</button>
+                        <button type="button" onclick="Calculator.stepValue('inpLength', -1)">-</button>
+                    </div>
+                </div>
+                <div class="stepper-box with-icon">
+                    <div class="input-icon-box">T</div>
+                    <div class="stepper-info">
+                        <span class="sub-lbl" data-i18n="lbl_time_sec">시간 (초) (SEC)</span>
+                        <input type="number" id="inpTimeSecTotal" value="1.0" step="0.5" oninput="Calculator.syncFromTotalSec()" />
+                    </div>
+                    <div class="stepper-btns">
+                        <button type="button" onclick="Calculator.stepTotalSec(1)">+</button>
+                        <button type="button" onclick="Calculator.stepTotalSec(-1)">-</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="time-split-box mt-12">
+                <div class="time-half">
+                    <div class="input-icon-box">M</div>
+                    <div class="stepper-info">
+                        <span class="sub-lbl" data-i18n="lbl_time_min">시간 (분) (MIN)</span>
+                        <input type="number" id="inpTimeMin" value="0" min="0" step="1" oninput="Calculator.syncFromMinSec()" />
+                    </div>
+                    <div class="stepper-btns">
+                        <button type="button" onclick="Calculator.stepMinSec('min', 1)">+</button>
+                        <button type="button" onclick="Calculator.stepMinSec('min', -1)">-</button>
+                    </div>
+                </div>
+                <div class="time-colon">:</div>
+                <div class="time-half">
+                    <div class="stepper-info">
+                        <span class="sub-lbl" data-i18n="lbl_time_sec">시간 (초) (SEC)</span>
+                        <input type="number" id="inpTimeSecPart" value="1.0" min="0" step="0.5" oninput="Calculator.syncFromMinSec()" />
+                    </div>
+                    <div class="stepper-btns">
+                        <button type="button" onclick="Calculator.stepMinSec('sec', 1)">+</button>
+                        <button type="button" onclick="Calculator.stepMinSec('sec', -1)">-</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 실시간 결과 -->
+        <section id="resultBanner" class="result-banner pass">
+            <div class="res-title" data-i18n="lbl_realtime_res">실 시 간  결 과</div>
+            <div class="res-val-wrap">
+                <span id="outHeatInput" class="res-number">1.440</span>
+                <span class="res-unit">kJ/mm</span>
+            </div>
+        </section>
+
+        <!-- ✨ 4가지 항목으로 분리된 용접사 메뉴 구역 -->
+        <section class="outline-card">
+            <div class="card-header-row">
+                <h2 class="card-title" data-i18n="title_welder_info">용접사 번호</h2>
+                <div class="mode-pill-group" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+    <button type="button" id="btnWelderManual" class="mode-pill active" onclick="Calculator.setWelderMode('manual')" data-i18n="btn_manual">수동</button>
+    <button type="button" id="btnWelderPreset" class="mode-pill" onclick="Calculator.setWelderMode('preset')" data-i18n="btn_preset">프리셋</button>
+    <button type="button" class="scan-pill" style="background:var(--brand-orange);" onclick="MainController.openScannerModal()" data-i18n="btn_scan">📷 스캔</button>
+    <button type="button" class="scan-pill" style="background:#10b981;" onclick="MainController.openLabelPrintModal()" data-i18n="btn_label_print">🏷️ 라벨인쇄</button>
+</div>
+            </div>
+
+            <div id="welderPresetView" class="hidden">
+                <button type="button" class="preset-list-bar" onclick="PresetManager.openViewer('welder')">
+                    👤 <span id="welderCountLbl">목록 보기 (0/300)</span>
+                </button>
+                <div class="preset-action-bar">
+                    <button type="button" class="preset-sub-btn" onclick="PresetManager.openEditor('welder')" data-i18n="btn_edit">편집</button>
+                    <button type="button" class="preset-sub-btn" onclick="PresetManager.downloadSample('welder')" data-i18n="btn_sample">⬇ 샘플</button>
+                    <button type="button" class="preset-sub-btn btn-green" onclick="PresetManager.exportBackup('welder')" data-i18n="btn_backup">⬇ 백업</button>
+                    <button type="button" class="preset-sub-btn" onclick="PresetManager.triggerImport('welder')" data-i18n="btn_upload">⬆ 업로드</button>
+                    <button type="button" class="preset-sub-btn btn-orange" onclick="PresetManager.triggerPdfImport('welder')" data-i18n="btn_pdf">PDF</button>
+                </div>
+            </div>
+
+            <div class="two-col-grid mt-12">
+                <div>
+                    <div class="field-label" data-i18n="lbl_welder_id">용접사 번호</div>
+                    <input type="text" id="inpWelderId" class="full-input" value="WLD-001" oninput="MainController.saveLastWorkState()" />
+                </div>
+                <div>
+                    <div class="field-label" data-i18n="lbl_welder_name">용접사 이름</div>
+                    <input type="text" id="inpWelderName" class="full-input" value="홍길동" oninput="MainController.saveLastWorkState()" />
+                </div>
+                <div>
+                    <div class="field-label" data-i18n="lbl_dept">소속 부서</div>
+                    <input type="text" id="inpWelderDept" class="full-input" value="136(FCAW) A팀" oninput="MainController.saveLastWorkState()" />
+                </div>
+                <div>
+                    <div class="field-label" data-i18n="lbl_joint_no">조인트 번호</div>
+                    <input type="text" id="inpJointNo" class="full-input" placeholder="" oninput="MainController.saveLastWorkState()" />
+                </div>
+            </div>
+
+            <div class="field-label mt-14" data-i18n="lbl_weld_pass">용접 패스</div>
+            <div class="pass-btn-group">
+                <button type="button" class="pass-btn active" onclick="Calculator.setPass('Root', this)">Root</button>
+                <button type="button" class="pass-btn" onclick="Calculator.setPass('Fill', this)">Fill</button>
+                <button type="button" class="pass-btn" onclick="Calculator.setPass('Cap', this)">Cap</button>
+            </div>
+        </section>
+
+        <div class="history-action-row">
+            <button type="button" class="act-btn btn-black" onclick="MainController.saveRecord()">
+                <span>+</span> <span data-i18n="btn_save_data">데이터 저장</span>
+            </button>
+            <button type="button" class="act-btn btn-outline" onclick="MainController.exportCSV()" data-i18n="btn_export_csv">CSV 내보내기</button>
+            <button type="button" class="act-btn btn-outline-dark" onclick="MainController.toggleHistoryTable()">
+                <span><span data-i18n="btn_recent_log">최근 이력</span> (<span id="logCount">0</span>)</span>
+            </button>
+            <button type="button" id="btnHistoryEditMode" class="act-btn btn-outline-dark" onclick="MainController.toggleHistoryEditMode()">
+                <span id="lblHistoryEditMode">✏️ 편집 모드</span>
+            </button>
+            <button type="button" class="act-btn btn-danger-outline" onclick="MainController.clearHistory()" data-i18n="btn_clear_log">이력 삭제</button>
+        </div>
+
+        <section class="table-outline-card">
+            <div id="historyEditToolbar" class="history-edit-toolbar hidden">
+                <span class="history-edit-guide" data-i18n-html="guide_history_edit">✏️ <strong>이력 편집 모드</strong> — 값을 수정하면 입열량이 자동 재계산됩니다.</span>
+                <div class="history-edit-actions">
+                    <button type="button" class="hist-tool-btn hist-btn-add" onclick="MainController.addHistoryEditRow()" data-i18n="btn_add_row">+ 행 추가</button>
+                    <button type="button" class="hist-tool-btn hist-btn-save" onclick="MainController.saveHistoryEdits()" data-i18n="btn_save_short">💾 저장</button>
+                    <button type="button" class="hist-tool-btn hist-btn-cancel" onclick="MainController.cancelHistoryEdits()" data-i18n="btn_cancel">취소</button>
+                </div>
+            </div>
+            <div class="table-scroll">
+                <table class="history-table">
+                    <thead>
+                        <tr id="historyTableHeadRow">
+                            <th data-i18n="th_date">날짜</th><th data-i18n="th_time">시간</th><th data-i18n="lbl_standard">규격</th><th data-i18n="lbl_process">용접 공정</th><th data-i18n="lbl_wps_no">WPS 번호</th><th data-i18n="lbl_weld_pass">용접 패스</th>
+                            <th data-i18n="lbl_welder_id">용접사 번호</th><th data-i18n="th_name">이름</th><th data-i18n="lbl_dept">소속 부서</th><th data-i18n="lbl_joint_no">조인트 번호</th><th>V</th><th>A</th><th>L</th><th>T</th><th data-i18n="lbl_realtime_res">실시간 결과</th><th data-i18n="th_judgment">판정</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <tr><td colspan="16" class="empty-msg">저장된 이력이 없습니다.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <footer class="app-footer">
+            <p>Heat Input Calculator Pro 2.3</p>
+            <p>Copyright © 2026 ISKorea Solutions. All rights reserved</p>
+            <p>contact : isksolution555@gmail.com</p>
+        </footer>
+    </main>
+
+    <script src="js/data_store.js" defer></script>
+    <script src="js/help_manual.js" defer></script>
+    <script src="js/calculator.js" defer></script>
+    <script src="pages/dashboard.js" defer></script>
+    <script src="js/main.js" defer></script>
+</body>
+</html>
