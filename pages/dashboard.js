@@ -45,7 +45,10 @@ const PresetManager = {
     },
 
     getMaxCount: function() {
-        return MainController.isPro ? 300 : 10;
+        if (typeof DataStore !== 'undefined' && typeof DataStore.isProUser === 'function') {
+            return DataStore.isProUser() ? 300 : 10;
+        }
+        return (typeof MainController !== 'undefined' && MainController.isPro) ? 300 : 10;
     },
 
     updateCounts: function() {
@@ -55,8 +58,8 @@ const PresetManager = {
         const viewTxt = this.t('btn_view_list');
         const wpsLbl = document.getElementById('wpsCountLbl');
         const welderLbl = document.getElementById('welderCountLbl');
-        if (wpsLbl) wpsLbl.innerText = `${viewTxt} (${wpsList.length}/${maxCnt})`;
-        if (welderLbl) welderLbl.innerText = `${viewTxt} (${welderList.length}/${maxCnt})`;
+        if (wpsLbl) wpsLbl.innerText = `${viewTxt} (${Math.min(wpsList.length, maxCnt)}/${maxCnt})`;
+        if (welderLbl) welderLbl.innerText = `${viewTxt} (${Math.min(welderList.length, maxCnt)}/${maxCnt})`;
 
         const stepBox = document.getElementById('wpsStepContainer');
         if (stepBox && !document.getElementById('wpsPresetView').classList.contains('hidden')) {
@@ -193,7 +196,7 @@ const PresetManager = {
         if (!modal || !body) return;
 
         const maxCount = this.getMaxCount();
-        title.innerHTML = this.renderPresetModalHeader(type, 'view', list.length, maxCount);
+        title.innerHTML = this.renderPresetModalHeader(type, 'view', Math.min(list.length, maxCount), maxCount);
 
         let html = `<div style="max-height:60vh; overflow-y:auto;"><table style="width:100%; border-collapse:collapse; font-size:13px;" border="1">`;
         const applyTxt = this.t('btn_apply');
@@ -470,19 +473,30 @@ const PresetManager = {
             }
 
             let finalList = [...existing, ...cleanedRows];
+            const maxAllowed = this.getMaxCount();
             
             // 저장 제한 확인
-            if (finalList.length > this.getMaxCount()) {
-                alert(this.t('alert_save_truncated', { max: this.getMaxCount() }));
-                finalList = finalList.slice(0, this.getMaxCount());
+            if (finalList.length > maxAllowed) {
+                alert(this.t('alert_save_truncated', { max: maxAllowed }));
+                finalList = finalList.slice(0, maxAllowed);
             }
 
-            if (type === 'wps' && DataStore.setWpsPresets) {
-                DataStore.setWpsPresets(finalList);
-            } else if (type !== 'wps' && DataStore.setWelderPresets) {
-                DataStore.setWelderPresets(finalList);
+            if (type === 'wps') {
+                if (DataStore.setWpsPresets) {
+                    DataStore.setWpsPresets(finalList);
+                } else {
+                    DataStore._wpsCache = finalList.slice(0, maxAllowed);
+                    localStorage.setItem('HI_WPS_PRESETS', JSON.stringify(DataStore._wpsCache));
+                    localStorage.setItem('HI_WPS_SAMPLE10_V23_ARB', 'true');
+                }
             } else {
-                localStorage.setItem(key, JSON.stringify(finalList));
+                if (DataStore.setWelderPresets) {
+                    DataStore.setWelderPresets(finalList);
+                } else {
+                    DataStore._welderCache = finalList.slice(0, maxAllowed);
+                    localStorage.setItem('HI_WELDER_PRESETS', JSON.stringify(DataStore._welderCache));
+                    localStorage.setItem('HI_WELDER_SAMPLE10_V23_ARB', 'true');
+                }
             }
             if (typeof MainController !== 'undefined') {
                 MainController._welderPoolCache = null;

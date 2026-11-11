@@ -627,18 +627,25 @@ const DataStore = {
     _wpsCache: null,
     _welderCache: null,
 
+    isProUser: function() {
+        if (typeof MainController !== 'undefined' && typeof MainController.isPro !== 'undefined') {
+            return Boolean(MainController.isPro);
+        }
+        return false;
+    },
+
     getMaxLimit: function() {
-        return (typeof MainController !== 'undefined' && MainController.isPro) ? 300 : 10;
+        return this.isProUser() ? 300 : 10;
     },
 
     getWpsPresets: function() {
-        const isPro = typeof MainController !== 'undefined' && Boolean(MainController.isPro);
+        const isPro = this.isProUser();
         if (!this._wpsCache) {
             try {
                 const sampleApplied = localStorage.getItem('HI_WPS_SAMPLE10_V23_ARB') === 'true';
                 const saved = localStorage.getItem('HI_WPS_PRESETS');
                 const parsed = saved ? JSON.parse(saved) : null;
-                if (!sampleApplied || !Array.isArray(parsed) || parsed.length === 0 || (!isPro && parsed.length > 10)) {
+                if (!sampleApplied || !Array.isArray(parsed) || parsed.length === 0) {
                     this._wpsCache = this.defaultWpsPresets.map(x => ({ ...x }));
                     localStorage.setItem('HI_WPS_PRESETS', JSON.stringify(this._wpsCache));
                     localStorage.setItem('HI_WPS_SAMPLE10_V23_ARB', 'true');
@@ -649,10 +656,10 @@ const DataStore = {
                 this._wpsCache = this.defaultWpsPresets.map(x => ({ ...x }));
             }
         }
-        if (!isPro && (this._wpsCache.length > 10 || this._wpsCache.length === 0)) {
-            return this.defaultWpsPresets.slice(0, 10);
+        if (!isPro) {
+            return this._wpsCache.slice(0, 10);
         }
-        return this._wpsCache.slice(0, isPro ? 300 : 10);
+        return this._wpsCache.slice(0, 300);
     },
 
     setWpsPresets: function(list) {
@@ -663,13 +670,13 @@ const DataStore = {
     },
 
     getWelderPresets: function() {
-        const isPro = typeof MainController !== 'undefined' && Boolean(MainController.isPro);
+        const isPro = this.isProUser();
         if (!this._welderCache) {
             try {
                 const sampleApplied = localStorage.getItem('HI_WELDER_SAMPLE10_V23_ARB') === 'true';
                 const saved = localStorage.getItem('HI_WELDER_PRESETS');
                 const parsed = saved ? JSON.parse(saved) : null;
-                if (!sampleApplied || !Array.isArray(parsed) || parsed.length === 0 || (!isPro && parsed.length > 10)) {
+                if (!sampleApplied || !Array.isArray(parsed) || parsed.length === 0) {
                     this._welderCache = this.defaultWelderPresets.map(x => ({ ...x }));
                     localStorage.setItem('HI_WELDER_PRESETS', JSON.stringify(this._welderCache));
                     localStorage.setItem('HI_WELDER_SAMPLE10_V23_ARB', 'true');
@@ -680,10 +687,10 @@ const DataStore = {
                 this._welderCache = this.defaultWelderPresets.map(x => ({ ...x }));
             }
         }
-        if (!isPro && (this._welderCache.length > 10 || this._welderCache.length === 0)) {
-            return this.defaultWelderPresets.slice(0, 10);
+        if (!isPro) {
+            return this._welderCache.slice(0, 10);
         }
-        return this._welderCache.slice(0, isPro ? 300 : 10);
+        return this._welderCache.slice(0, 300);
     },
 
     setWelderPresets: function(list) {

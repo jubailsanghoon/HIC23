@@ -21,7 +21,10 @@ const Calculator = {
         if (mode === 'preset') {
             manualView.classList.add('hidden');
             presetView.classList.remove('hidden');
-            PresetManager.renderWpsStep1();
+            if (typeof PresetManager !== 'undefined') {
+                PresetManager.updateCounts();
+                PresetManager.renderWpsStep1();
+            }
         } else {
             manualView.classList.remove('hidden');
             presetView.classList.add('hidden');

@@ -4,7 +4,6 @@
  */
 const MainController = (() => {
     // 프라이빗 클로저 보안 영역 (콘솔 조작 및 소스코드 평문 검색 방지)
-    let _proVerifiedState = false;
     const _B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
     // XOR 난독화된 시크릿 및 마스크 솔트
     const _SC_ENC = [157, 225, 147, 231, 152, 250, 158, 251, 146, 248];
@@ -169,7 +168,7 @@ const MainController = (() => {
         }
     };
 
-    const _verifyCodeDetail = async rawCode => {
+    const _verifyCodeDetailSync = rawCode => {
         if (!rawCode || !/^(HI40|TR48)-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(rawCode)) {
             return { ok: false, reason: 'FORMAT' };
         }
@@ -184,7 +183,7 @@ const MainController = (() => {
             const maskSalt = _decBytes(_MS_ENC);
 
             if (prefix === 'HI40') {
-                const mask = await _sha256Bytes(maskSalt + g1);
+                const mask = _pureSha256(maskSalt + g1);
                 for (let i = 0; i < 10; i++) {
                     const expectedIdx = _B32.indexOf(secretCore[i]) ^ (mask[i] & 31);
                     if (_B32[expectedIdx] !== g23[i]) return { ok: false, reason: 'SIGNATURE' };
@@ -201,7 +200,7 @@ const MainController = (() => {
             // TR48: 48시간 조건부 PRO 코드 (타임스탬프 내장형 T3+S7 또는 상태비저장 S10 모두 지원)
             const t3 = g23.slice(0, 3);
             const s7 = g23.slice(3, 10);
-            const maskTs = await _sha256Bytes(maskSalt + 'TR48|' + g1 + '|' + t3);
+            const maskTs = _pureSha256(maskSalt + 'TR48|' + g1 + '|' + t3);
             let tsMatch = true;
             for (let i = 0; i < 7; i++) {
                 const expectedIdx = _B32.indexOf(secretCore[i]) ^ (maskTs[i] & 31);
@@ -220,7 +219,7 @@ const MainController = (() => {
                 const issueHour = (h0 << 10) | (h1 << 5) | h2;
                 issuedAtMs = _EPOCH_2026_MS + issueHour * 3600000;
             } else {
-                const maskStatic = await _sha256Bytes(maskSalt + 'TR48_' + g1);
+                const maskStatic = _pureSha256(maskSalt + 'TR48_' + g1);
                 for (let i = 0; i < 10; i++) {
                     const expectedIdx = _B32.indexOf(secretCore[i]) ^ (maskStatic[i] & 31);
                     if (_B32[expectedIdx] !== g23[i]) return { ok: false, reason: 'SIGNATURE' };
@@ -256,10 +255,26 @@ const MainController = (() => {
         }
     };
 
+    const _verifyCodeDetail = async rawCode => _verifyCodeDetailSync(rawCode);
+
     const _verifyCodeInternal = async rawCode => {
-        const res = await _verifyCodeDetail(rawCode);
+        const res = _verifyCodeDetailSync(rawCode);
         return res.ok;
     };
+
+    const _checkProSynchronous = () => {
+        try {
+            const raw = localStorage.getItem('HI_PRO_LICENSE_V2');
+            if (!raw) return false;
+            const parsed = JSON.parse(raw);
+            if (!parsed || !parsed.code) return false;
+            const res = _verifyCodeDetailSync(parsed.code);
+            return Boolean(res && res.ok === true);
+        } catch (e) {
+            return false;
+        }
+    };
+    let _proVerifiedState = _checkProSynchronous();
 
     const ctrl = {
     STORAGE_LOG_KEY: 'HI_CALC_RECORDS_V2',
@@ -269,7 +284,7 @@ const MainController = (() => {
     LAST_WORK_STATE_KEY: 'HI_LAST_WORK_STATE_V23',
     OFFLINE_QUEUE_KEY: 'HI_OFFLINE_SYNC_QUEUE_V23',
     SHORTCUT_PROMPT_KEY: 'HI_SHORTCUT_ADDED_V23_PC_AUTO',
-    get isPro() { return _proVerifiedState; },
+    get isPro() { return Boolean(_proVerifiedState); },
     set isPro(_val) { /* 외부 콘솔에서의 강제 할당(MainController.isPro = true) 무시 */ },
     _currentModalType: null,
     _isRestoringWorkState: false,
@@ -440,7 +455,7 @@ const MainController = (() => {
     precacheOfflineAssets: async function() {
         try {
             if ('caches' in window && (location.protocol === 'https:' || location.protocol === 'http:')) {
-                const cache = await caches.open('hi-calc-pro-v23-offline-v16');
+                const cache = await caches.open('hi-calc-pro-v23-offline-v17');
                 await cache.addAll([
                     './',
                     './index.html',
@@ -3493,6 +3508,10 @@ const MainController = (() => {
     checkProStatus: async function() {
         const badge = document.getElementById('proBadge');
         this._welderPoolCache = null;
+        if (typeof DataStore !== 'undefined') {
+            DataStore._wpsCache = null;
+            DataStore._welderCache = null;
+        }
         try {
             const saved = JSON.parse(localStorage.getItem(this.LICENSE_KEY));
             if (saved && saved.code) {
@@ -3509,6 +3528,7 @@ const MainController = (() => {
                             badge.style.backgroundColor = '#12b886';
                         }
                     }
+                    if (typeof PresetManager !== 'undefined') PresetManager.updateCounts();
                     return;
                 } else if (detail.reason === 'TRIAL_EXPIRED') {
                     // 48시간 만료 시 저장된 임시 라이선스 자동 해제
