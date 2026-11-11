@@ -6,6 +6,12 @@ const PresetManager = {
     currentImportType: 'wps',
     selectedWpsNo: null,
     tempEditingData: [],
+    isWpsListCollapsed: false,
+
+    toggleWpsList: function() {
+        this.isWpsListCollapsed = !this.isWpsListCollapsed;
+        this.renderWpsStep1();
+    },
 
     // WPS 번호 뒤에 이미 (Pass명)이 붙어있으면 중복 없이 "WPS번호 (Pass)" 형태로 포맷팅
     formatWpsWithPass: function(wpsNo, passName) {
@@ -93,15 +99,38 @@ const PresetManager = {
             : '';
 
         const uniqueWps = [...new Set(list.map(item => item.wpsNo || item.id).filter(Boolean))];
+        const isCollapsed = Boolean(this.isWpsListCollapsed);
+        const collapseBtnTxt = isCollapsed ? this.t('btn_expand_list') : this.t('btn_collapse_list');
+
         let html = `
             ${selectedBanner}
-            <div style="font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:8px;">${this.t('step1_wps_select')}</div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-size:12px; font-weight:700; color:var(--text-muted);">${this.t('step1_wps_select')} (${uniqueWps.length})</span>
+                <button type="button" class="wps-toggle-btn" onclick="PresetManager.toggleWpsList()" title="${this.escapeAttr(collapseBtnTxt)}">
+                    ${this.escapeAttr(collapseBtnTxt)}
+                </button>
+            </div>
         `;
-        uniqueWps.forEach(wpsNo => {
-            html += `<button type="button" class="wps-chip-btn" data-wps-no="${this.escapeAttr(wpsNo)}" onclick="PresetManager.renderWpsStep2(this.getAttribute('data-wps-no'))">${this.escapeAttr(wpsNo)}</button>`;
-        });
-        html += `</div>`;
+
+        if (isCollapsed) {
+            html += `
+                <div style="padding:12px 14px; background:var(--bg-soft); border-radius:8px; font-size:12px; font-weight:700; color:var(--text-muted); text-align:center; cursor:pointer; border:1px dashed var(--border-light);" onclick="PresetManager.toggleWpsList()">
+                    ${this.t('msg_wps_list_collapsed', { cnt: uniqueWps.length })}
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="wps-grid-scroll">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            `;
+            uniqueWps.forEach(wpsNo => {
+                html += `<button type="button" class="wps-chip-btn" data-wps-no="${this.escapeAttr(wpsNo)}" onclick="PresetManager.renderWpsStep2(this.getAttribute('data-wps-no'))">${this.escapeAttr(wpsNo)}</button>`;
+            });
+            html += `
+                    </div>
+                </div>
+            `;
+        }
         container.innerHTML = html;
     },
 
@@ -121,7 +150,8 @@ const PresetManager = {
                 <span style="font-size:12px; font-weight:700; color:var(--text-muted);">${this.t('step2_pass_select')} (${this.escapeAttr(wpsNo)})</span>
                 <button type="button" style="background:none; border:none; color:var(--brand-orange); font-size:12px; font-weight:800; cursor:pointer;" onclick="PresetManager.renderWpsStep1()">${this.t('btn_back')}</button>
             </div>
-            <div style="display:flex; flex-direction:column; gap:8px;">
+            <div class="wps-grid-scroll">
+                <div style="display:flex; flex-direction:column; gap:8px;">
         `;
         filtered.forEach(item => {
             const globalIdx = list.indexOf(item);
@@ -130,7 +160,10 @@ const PresetManager = {
             const maxVal = (Number(item.max) || 0).toFixed(2);
             html += `<button type="button" class="pass-card-btn" onclick="PresetManager.applyWpsStep2Selection(${globalIdx})">${passName} | ${minVal}~${maxVal} kJ/mm</button>`;
         });
-        html += `</div>`;
+        html += `
+                </div>
+            </div>
+        `;
         container.innerHTML = html;
     },
 
