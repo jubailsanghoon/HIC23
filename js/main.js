@@ -374,7 +374,8 @@ const MainController = (() => {
                 this._deferredInstallPrompt = window.__deferredInstallPrompt;
             }
             if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')) {
-                navigator.serviceWorker.register('./sw.js').then(() => {
+                navigator.serviceWorker.register('./sw.js').then(reg => {
+                    if (reg) reg.update();
                     return navigator.serviceWorker.ready;
                 }).then(() => {
                     if (!this._deferredInstallPrompt && !window.__deferredInstallPrompt) {

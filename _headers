@@ -1,2 +1,8 @@
 /*
   Content-Security-Policy: frame-ancestors 'self' https://sites.google.com https://*.google.com;
+
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate

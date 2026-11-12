@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hi-calc-pro-v24-offline-v1';
+const CACHE_NAME = 'hi-calc-pro-v24-offline-v2';
 const CORE_ASSETS = [
     './',
     './index.html',
