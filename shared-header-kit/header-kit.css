@@ -1,0 +1,314 @@
+/**
+ * shared-header-kit/header-kit.css
+ * 공용 표준 상단 헤더 컴포넌트 스타일시트 (v1.0)
+ */
+
+:root {
+    --hk-bg: #ffffff;
+    --hk-text: #111111;
+    --hk-text-muted: #868e96;
+    --hk-btn-bg: #f1f3f5;
+    --hk-btn-hover: #e9ecef;
+    --hk-btn-active: #dee2e6;
+    --hk-border: #e9ecef;
+    --hk-brand-orange: #ff7f00;
+    --hk-wifi-online: #2563eb;
+    --hk-wifi-offline: #ea580c;
+    --hk-pro-green: #12b886;
+}
+
+html.dark {
+    --hk-bg: #1e293b;
+    --hk-text: #f8fafc;
+    --hk-text-muted: #94a3b8;
+    --hk-btn-bg: #334155;
+    --hk-btn-hover: #475569;
+    --hk-btn-active: #64748b;
+    --hk-border: #334155;
+    --hk-wifi-online: #60a5fa;
+    --hk-wifi-offline: #fb923c;
+}
+
+/* 상단 헤더 래퍼 */
+.top-header {
+    background-color: var(--hk-bg);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 1px solid var(--hk-border);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.header-inner {
+    max-width: 1380px;
+    margin: 0 auto;
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+/* 좌측 브랜드 (로고 + 반응형 타이틀) */
+.brand-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+.app-logo-box {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.app-logo-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.brand-text {
+    min-width: 0;
+}
+
+.brand-text h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--hk-text);
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.title-full { display: inline; }
+.title-short { display: none; }
+
+@media (max-width: 720px) {
+    .title-full { display: none; }
+    .title-short { display: inline; }
+}
+
+@media (max-width: 400px) {
+    .brand-text h1 { font-size: 16px; }
+    .app-logo-box { width: 34px; height: 34px; }
+}
+
+/* 우측 일원화 액션 컨트롤 그룹 */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* 공통 헤더 버튼 및 뱃지 */
+.hdr-btn {
+    height: 38px;
+    min-width: 38px;
+    padding: 0 10px;
+    border-radius: 10px;
+    border: none;
+    background-color: var(--hk-btn-bg);
+    color: var(--hk-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1;
+    text-decoration: none;
+    user-select: none;
+    transition: background-color 0.15s ease, transform 0.1s ease, color 0.15s ease;
+    box-sizing: border-box;
+}
+
+.hdr-btn:hover {
+    background-color: var(--hk-btn-hover);
+}
+
+.hdr-btn:active {
+    background-color: var(--hk-btn-active);
+    transform: scale(0.97);
+}
+
+/* 1. 버전 뱃지 */
+.hdr-btn-ver {
+    cursor: default;
+    color: var(--hk-text);
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    text-align: center;
+}
+.hdr-btn-ver:active {
+    transform: none;
+}
+
+/* 2. Pro/Free 라이선스 뱃지 (정사각형 비율) */
+.hdr-btn-pro {
+    font-weight: 900;
+    letter-spacing: -0.2px;
+    cursor: pointer;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    text-align: center;
+}
+
+.hdr-btn-pro.is-pro {
+    color: #ffffff;
+    background-color: var(--hk-pro-green);
+}
+
+.hdr-btn-pro.is-trial {
+    color: #ffffff;
+    background-color: #f59f00;
+}
+
+.hdr-btn-pro.is-free {
+    color: var(--hk-text);
+    background-color: var(--hk-btn-bg);
+}
+
+/* 3. WiFi 통신 상태 뱃지 */
+.hdr-btn-net {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    cursor: pointer;
+}
+
+.hdr-btn-net .wifi-svg {
+    transition: color 0.2s ease;
+}
+
+.hdr-btn-net.online .wifi-svg {
+    color: var(--hk-wifi-online);
+}
+
+.hdr-btn-net.offline .wifi-svg {
+    color: var(--hk-wifi-offline);
+}
+
+/* 모바일 화면에서는 공간 확보를 위해 WiFi 뱃지 자동 숨김 */
+@media (max-width: 580px) {
+    .hdr-btn-net {
+        display: none !important;
+    }
+}
+
+/* 4. 다크모드 토글 버튼 */
+#btnDarkMode {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+}
+
+/* 5. 원형 국기 언어 선택 드롭다운 */
+.lang-dropdown-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.lang-btn {
+    padding: 0 8px;
+    gap: 4px;
+}
+
+.flag-icon-circle {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+    flex-shrink: 0;
+}
+
+.flag-icon-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.lang-caret {
+    opacity: 0.6;
+    transition: transform 0.2s ease;
+}
+
+.lang-dropdown-wrap.open .lang-caret {
+    transform: rotate(180deg);
+}
+
+.lang-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 140px;
+    background-color: var(--hk-bg);
+    border: 1px solid var(--hk-border);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    padding: 6px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.lang-dropdown-menu.hidden {
+    display: none !important;
+}
+
+.lang-item {
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--hk-text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.12s ease;
+}
+
+.lang-item:hover {
+    background-color: var(--hk-btn-bg);
+}
+
+.lang-item.active {
+    background-color: var(--hk-btn-bg);
+    color: var(--hk-brand-orange);
+    font-weight: 800;
+}
+
+/* 6. 도움말 버튼 */
+#btnManual {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+}

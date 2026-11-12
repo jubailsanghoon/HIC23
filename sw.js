@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hi-calc-pro-v23-offline-v20';
+const CACHE_NAME = 'hi-calc-pro-v24-offline-v1';
 const CORE_ASSETS = [
     './',
     './index.html',
@@ -8,6 +8,14 @@ const CORE_ASSETS = [
     './kakao-channel-qr.svg',
     './wps_sample.txt',
     './welder_sample.txt',
+    './shared-header-kit/header-kit.css',
+    './shared-header-kit/header-kit.js',
+    './shared-header-kit/icons/app-logo.png',
+    './shared-header-kit/icons/flag_ko.png',
+    './shared-header-kit/icons/flag_en.png',
+    './shared-header-kit/icons/flag_zh.png',
+    './shared-header-kit/icons/flag_ja.png',
+    './shared-header-kit/icons/flag_es.png',
     './css/style.css',
     './js/data_store.js',
     './js/help_manual.js',
@@ -19,7 +27,7 @@ const CORE_ASSETS = [
 const SW_MANIFEST_JSON = JSON.stringify({
     name: "HeatInPut Calculator",
     short_name: "HeatInPut Calculator",
-    description: "Welding Heat Input Calculator v2.3 (Offline-Ready)",
+    description: "Welding Heat Input Calculator v2.4 (Offline-Ready)",
     start_url: "./index.html",
     scope: "./",
     display: "standalone",

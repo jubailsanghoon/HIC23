@@ -12,7 +12,7 @@
     <link rel="icon" type="image/svg+xml" href="hi-logo.svg" />
     <link rel="icon" type="image/png" href="hi-logo.png" />
     <link rel="apple-touch-icon" href="hi-logo.png" />
-    <title>Heat Input Calculator Pro 2.3</title>
+    <title>Heat Input Calculator Pro 2.4</title>
     <script>
         // 카카오톡 인앱 브라우저 감지 시 강제 기본 브라우저(크롬/삼성인터넷/사파리) 탈출 및 바로가기 유도
         (function() {
@@ -79,46 +79,70 @@
             } catch(e){}
         })();
     </script>
+    <link rel="stylesheet" href="shared-header-kit/header-kit.css" />
     <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 
     <header class="top-header">
-        <div class="header-inner">
-            <div class="brand-wrap" onclick="MainController.showMainView()" style="cursor:pointer;">
-                <div class="app-logo-box">
-                    <img src="hi-logo.png" alt="HI Logo" />
-                </div>
-                <div class="brand-text">
-                    <h1>Heat Input Calculator</h1>
-                    <div class="version-row">
-                        <span class="ver-txt">v2.3</span>
-                        <span id="proBadge" class="pro-badge" style="background-color:#868e96; cursor:pointer;" onclick="event.stopPropagation(); MainController.openModal('pages/settings.html');" title="PRO 인증 설정">FREE 버전</span>
-                        <span id="netStatusBadge" class="net-badge online" style="cursor:pointer;" onclick="event.stopPropagation(); MainController.handleNetBadgeClick();">🟢 온라인</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="header-actions">
-                <button class="hdr-btn" onclick="MainController.toggleDarkMode()" title="다크모드 전환">
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
-                </button>
-                <div class="lang-pill">
-                    <svg viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-                    <select id="langSelect" onchange="MainController.changeLanguage(this.value)">
-                        <option value="ko">KO</option>
-                        <option value="en">EN</option>
-                        <option value="es">ES</option>
-                        <option value="zh">ZH</option>
-                        <option value="ja">JA</option>
-                    </select>
-                </div>
-                <button class="hdr-btn" onclick="MainController.openModal('pages/dashboard.html')" title="도움말 및 규격 매뉴얼">
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
-                </button>
-            </div>
+      <div class="header-inner">
+        <!-- 좌측 브랜드 (로고 + 전체/축약 반응형 타이틀) -->
+        <div class="brand-wrap" onclick="window.scrollTo({top:0, behavior:'smooth'})">
+          <div class="app-logo-box">
+            <img src="shared-header-kit/icons/app-logo.png" alt="App Logo" />
+          </div>
+          <div class="brand-text">
+            <h1 id="appTitle">
+              <span class="title-full">용접 입열량 및 냉각속도 계산기</span>
+              <span class="title-short">입열량 계산기</span>
+            </h1>
+          </div>
         </div>
-        <div class="orange-divider"></div>
+
+        <!-- 우측 일원화 액션 컨트롤 -->
+        <div class="header-actions">
+          <!-- 1. 앱 버전 뱃지 -->
+          <span class="hdr-btn hdr-btn-ver" id="appVersionBadge">v2.4</span>
+
+          <!-- 2. Pro/Free 라이선스 뱃지 -->
+          <button type="button" id="proBadge" class="hdr-btn hdr-btn-pro">Free</button>
+
+          <!-- 3. WiFi 통신 상태 뱃지 (모바일 화면에서는 자동 숨김) -->
+          <div id="netStatusBadge" class="hdr-btn hdr-btn-net online" title="온라인">
+            <svg class="wifi-svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M12 18.5a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6zm-4.3-3.2a6.1 6.1 0 0 1 8.6 0 .9.9 0 0 0 1.3-1.3 7.9 7.9 0 0 0-11.2 0 .9.9 0 0 0 1.3 1.3zm-2.9-2.9a10.2 10.2 0 0 1 14.4 0 .9.9 0 0 0 1.3-1.3 12 12 0 0 0-17 0 .9.9 0 0 0 1.3 1.3zm-2.9-2.9a14.3 14.3 0 0 1 20.2 0 .9.9 0 0 0 1.3-1.3 16.1 16.1 0 0 0-22.8 0 .9.9 0 0 0 1.3 1.3z"/>
+            </svg>
+          </div>
+
+          <!-- 4. 다크모드 토글 -->
+          <button type="button" class="hdr-btn" id="btnDarkMode" title="다크 모드">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/>
+            </svg>
+          </button>
+
+          <!-- 5. 원형 국기 언어 선택 드롭다운 -->
+          <div class="lang-dropdown-wrap">
+            <button type="button" class="hdr-btn lang-btn" id="btnLangDropdown">
+              <span id="currentFlagIcon" class="flag-icon-circle"><img src="shared-header-kit/icons/flag_ko.png" alt="KO" /></span>
+              <svg class="lang-caret" viewBox="0 0 10 6" width="8" height="6" fill="currentColor"><path d="M0 0l5 5 5-5z"/></svg>
+            </button>
+            <div id="langDropdownMenu" class="lang-dropdown-menu hidden">
+              <button type="button" class="lang-item active" data-lang="ko"><span class="flag-icon-circle"><img src="shared-header-kit/icons/flag_ko.png" alt="KO" /></span><span>한국어</span></button>
+              <button type="button" class="lang-item" data-lang="en"><span class="flag-icon-circle"><img src="shared-header-kit/icons/flag_en.png" alt="EN" /></span><span>English</span></button>
+              <button type="button" class="lang-item" data-lang="zh"><span class="flag-icon-circle"><img src="shared-header-kit/icons/flag_zh.png" alt="ZH" /></span><span>简体中文</span></button>
+              <button type="button" class="lang-item" data-lang="ja"><span class="flag-icon-circle"><img src="shared-header-kit/icons/flag_ja.png" alt="JA" /></span><span>日本語</span></button>
+              <button type="button" class="lang-item" data-lang="es"><span class="flag-icon-circle"><img src="shared-header-kit/icons/flag_es.png" alt="ES" /></span><span>Español</span></button>
+            </div>
+          </div>
+
+          <!-- 6. 도움말 버튼 -->
+          <button type="button" class="hdr-btn" id="btnManual" title="도움말">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="orange-divider"></div>
     </header>
 
     <!-- 카카오톡 인앱 브라우저 감지 시 전체화면 강제 탈출 유도 모달 오버레이 -->
@@ -424,11 +448,50 @@
         </section>
 
         <footer class="app-footer">
-            <p>Heat Input Calculator Pro 2.3</p>
+            <p>Heat Input Calculator Pro 2.4</p>
             <p>Copyright © 2026 ISKorea Solutions. All rights reserved</p>
             <p>contact : isksolution555@gmail.com</p>
         </footer>
     </main>
+
+    <!-- 3단계: 공용 헤더 스크립트 연결 및 초기화 -->
+    <script src="shared-header-kit/header-kit.js"></script>
+    <script>
+      HeaderKit.init({
+        version: "v2.4",
+        isPro: false,
+        defaultLang: localStorage.getItem('HI_LANG') || "ko",
+        onThemeChange: (theme) => {
+          if (typeof MainController !== 'undefined' && typeof MainController.toggleDarkMode === 'function') {
+            // MainController와 테마 동기화
+          }
+        },
+        onLanguageChange: (lang) => {
+          const titles = {
+            ko: { full: "용접 입열량 및 냉각속도 계산기", short: "입열량 계산기" },
+            en: { full: "Heat Input & Cooling Rate Calculator", short: "Heat Input Calc" },
+            zh: { full: "焊接热输入与冷却速度计算器", short: "热输入计算器" },
+            ja: { full: "溶接 入熱量・冷却速度 計算機", short: "入熱量 計算機" },
+            es: { full: "Calculadora de Aporte Térmico y Enfriamiento", short: "Calc. Aporte Térmico" }
+          };
+          const t = titles[lang] || titles.ko;
+          HeaderKit.setTitle(t.full, t.short);
+          if (typeof MainController !== 'undefined' && typeof MainController.changeLanguage === 'function') {
+            MainController.changeLanguage(lang);
+          }
+        },
+        onLicenseClick: (isPro) => {
+          if (typeof MainController !== 'undefined') {
+            MainController.openModal('pages/settings.html');
+          }
+        },
+        onHelpClick: () => {
+          if (typeof MainController !== 'undefined') {
+            MainController.openModal('pages/dashboard.html');
+          }
+        }
+      });
+    </script>
 
     <script src="js/data_store.js" defer></script>
     <script src="js/help_manual.js" defer></script>

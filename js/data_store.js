@@ -1,6 +1,6 @@
 /**
  * js/data_store.js
- * 5개국어 UI 번역 사전 및 WPS/용접사 기본 프리셋 데이터 (v2.3)
+ * 5개국어 UI 번역 사전 및 WPS/용접사 기본 프리셋 데이터 (v2.4)
  */
 const DataStore = {
     kFactors: {
@@ -96,7 +96,7 @@ const DataStore = {
             confirm_clear_history: "저장된 모든 측정 이력을 삭제하시겠습니까?",
             alert_no_csv_data: "내보낼 이력이 없습니다.",
             // PRO 전환 알림창 및 설정 모달
-            badge_free: "FREE 버전", badge_pro: "PRO ✓",
+            badge_free: "Free", badge_pro: "Pro",
             alert_pro_edit: "🔒 프리셋 편집 기능은 PRO 버전 전용입니다.\nPRO 리딤 코드를 입력하면 자유로운 프리셋 추가/편집(최대 300개)이 활성화됩니다.",
             alert_pro_pdf: "🔒 PDF 자동 추출 기능은 PRO 버전 전용입니다.\nPRO 리딤 코드를 입력하면 무제한 데이터 파싱이 가능해집니다.",
             alert_pro_scan: "🔒 이 기능은 PRO 버전 전용입니다.\nPRO 리딤 코드를 입력하면 용접사 헬멧 스캔(QR·바코드·일반스티커) 기능이 활성화됩니다.",
@@ -124,7 +124,7 @@ const DataStore = {
             ph_reg_name: "예: 홍길동 / {dev}",
             lbl_reg_code: "리딤 코드 입력 (REDEEM CODE)",
             btn_activate_pro: "PRO 버전 활성화",
-            msg_kakao_copy_template: "안녕하세요! Heat Input Calculator Pro 2.3 리딤 코드 신청합니다.{user}\n내 기기 고유번호: {dev}",
+            msg_kakao_copy_template: "안녕하세요! Heat Input Calculator Pro 2.4 리딤 코드 신청합니다.{user}\n내 기기 고유번호: {dev}",
             msg_kakao_user_prefix: "\n신청자: ",
             alert_kakao_copied: "내 기기 고유번호({dev})와 신청 문구가 복사되었습니다.\n열리는 카카오 채널에서 공지사항을 확인하신 후, 채널 내 [1:1 채팅]에 붙여넣기(전송)해 주세요!",
             alert_dev_id_copied: "내 기기 고유번호가 복사되었습니다: {dev}",
@@ -241,7 +241,7 @@ const DataStore = {
             ph_reg_name: "e.g. John Doe / {dev}",
             lbl_reg_code: "Enter Redeem Code (REDEEM CODE)",
             btn_activate_pro: "Activate PRO",
-            msg_kakao_copy_template: "Hello! Requesting a Heat Input Calculator Pro 2.3 redeem code.{user}\nMy Device ID: {dev}",
+            msg_kakao_copy_template: "Hello! Requesting a Heat Input Calculator Pro 2.4 redeem code.{user}\nMy Device ID: {dev}",
             msg_kakao_user_prefix: "\nUser: ",
             alert_kakao_copied: "Your Device ID ({dev}) and request message have been copied.\nPlease read the notices on the Kakao Channel and paste/send it in the channel's [1:1 Chat]!",
             alert_dev_id_copied: "My Device ID copied: {dev}",
@@ -358,7 +358,7 @@ const DataStore = {
             ph_reg_name: "Ej.: Juan Pérez / {dev}",
             lbl_reg_code: "Código de Canje (REDEEM CODE)",
             btn_activate_pro: "Activar Versión PRO",
-            msg_kakao_copy_template: "¡Hola! Solicito código de canje para Heat Input Calculator Pro 2.3.{user}\nID de mi dispositivo: {dev}",
+            msg_kakao_copy_template: "¡Hola! Solicito código de canje para Heat Input Calculator Pro 2.4.{user}\nID de mi dispositivo: {dev}",
             msg_kakao_user_prefix: "\nSolicitante: ",
             alert_kakao_copied: "Se copió el ID de su dispositivo ({dev}) y el mensaje de solicitud.\n¡Revise los avisos en el Canal de Kakao y péguelo en el [Chat 1:1] del canal!",
             alert_dev_id_copied: "ID de mi dispositivo copiado: {dev}",
@@ -475,7 +475,7 @@ const DataStore = {
             ph_reg_name: "例：张三 / {dev}",
             lbl_reg_code: "输入激活码 (REDEEM CODE)",
             btn_activate_pro: "激活 PRO 版本",
-            msg_kakao_copy_template: "您好！申请 Heat Input Calculator Pro 2.3 激活码。{user}\n我的设备识别码: {dev}",
+            msg_kakao_copy_template: "您好！申请 Heat Input Calculator Pro 2.4 激活码。{user}\n我的设备识别码: {dev}",
             msg_kakao_user_prefix: "\n申请人: ",
             alert_kakao_copied: "您的设备识别码 ({dev}) 和申请文字已复制。\n请在打开的 Kakao 频道中查看公告后，在频道内的 [1:1 聊天] 中粘贴并发送！",
             alert_dev_id_copied: "我的设备识别码已复制: {dev}",
@@ -592,7 +592,7 @@ const DataStore = {
             ph_reg_name: "例：山田太郎 / {dev}",
             lbl_reg_code: "リディームコード入力 (REDEEM CODE)",
             btn_activate_pro: "PRO 版を有効化",
-            msg_kakao_copy_template: "こんにちは！Heat Input Calculator Pro 2.3 リディームコードを申請します。{user}\n機器固有番号: {dev}",
+            msg_kakao_copy_template: "こんにちは！Heat Input Calculator Pro 2.4 リディームコードを申請します。{user}\n機器固有番号: {dev}",
             msg_kakao_user_prefix: "\n申請者: ",
             alert_kakao_copied: "機器固有番号({dev})と申請文がコピーされました。\n開いたカカオチャンネルでお知らせを確認後、チャンネル内の [1:1チャット] に貼り付けて送信してください！",
             alert_dev_id_copied: "機器固有番号がコピーされました: {dev}",

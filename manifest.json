@@ -1,7 +1,7 @@
 {
   "name": "HeatInPut Calculator",
   "short_name": "HeatInPut Calculator",
-  "description": "Welding Heat Input Calculator v2.3 (Offline-Ready)",
+  "description": "Welding Heat Input Calculator v2.4 (Offline-Ready)",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

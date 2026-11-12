@@ -691,14 +691,16 @@ const MainController = (() => {
         if (!badge) return;
         const isOnline = navigator.onLine !== false;
         const pendingCnt = this.getPendingSyncCount();
+        const titleStr = isOnline
+            ? this.t('net_online')
+            : (pendingCnt > 0 ? this.t('net_offline_pending', { cnt: pendingCnt }) : this.t('net_offline'));
         badge.classList.toggle('online', isOnline);
         badge.classList.toggle('offline', !isOnline);
-        if (isOnline) {
-            badge.innerText = this.t('net_online');
-        } else {
-            badge.innerText = pendingCnt > 0
-                ? this.t('net_offline_pending', { cnt: pendingCnt })
-                : this.t('net_offline');
+        badge.setAttribute('title', titleStr);
+        if (typeof HeaderKit !== 'undefined' && typeof HeaderKit.setNetStatus === 'function') {
+            HeaderKit.setNetStatus(isOnline, titleStr);
+        } else if (!badge.querySelector('.wifi-svg')) {
+            badge.innerText = titleStr;
         }
     },
 
@@ -803,10 +805,30 @@ const MainController = (() => {
             if (dict[key]) el.innerHTML = dict[key];
         });
 
+        if (typeof HeaderKit !== 'undefined') {
+            HeaderKit.setLanguage(lang, false);
+            const titles = {
+                ko: { full: "용접 입열량 및 냉각속도 계산기", short: "입열량 계산기" },
+                en: { full: "Heat Input & Cooling Rate Calculator", short: "Heat Input Calc" },
+                zh: { full: "焊接热输入与冷却速度计算器", short: "热输入计算器" },
+                ja: { full: "溶接 入熱量・冷却速度 計算機", short: "入熱量 計算機" },
+                es: { full: "Calculadora de Aporte Térmico y Enfriamiento", short: "Calc. Aporte Térmico" }
+            };
+            const t = titles[lang] || titles.ko;
+            HeaderKit.setTitle(t.full, t.short);
+        }
+
         const badge = document.getElementById('proBadge');
         if (badge) {
-            badge.innerText = _proVerifiedState ? this.t('badge_pro') : this.t('badge_free');
-            badge.style.backgroundColor = _proVerifiedState ? '#12b886' : '#868e96';
+            if (_proVerifiedState) {
+                badge.innerText = this.t('badge_pro');
+                badge.style.backgroundColor = '#12b886';
+                badge.style.color = '#ffffff';
+            } else {
+                badge.innerText = 'Free';
+                badge.style.backgroundColor = '';
+                badge.style.color = '';
+            }
         }
 
         if (typeof PresetManager !== 'undefined' && typeof PresetManager.updateCounts === 'function') {
@@ -3308,7 +3330,7 @@ const MainController = (() => {
             if (typeof HelpManual !== 'undefined') {
                 HelpManual.renderModal(lang, title, body);
             } else {
-                title.innerText = '📘 국제 규격 매뉴얼 & 입열량 가이드 (v2.3)';
+                title.innerText = '📘 국제 규격 매뉴얼 & 입열량 가이드 (v2.4)';
                 body.innerHTML = `<div style="padding:20px;">js/help_manual.js 파일을 로드해 주세요.</div>`;
             }
             modal.classList.remove('hidden');
@@ -3523,10 +3545,15 @@ const MainController = (() => {
                         if (detail.isTrial) {
                             badge.innerText = this.t('badge_pro_trial', { rem: detail.remainingHours || 48 });
                             badge.style.backgroundColor = '#f59f00';
+                            badge.style.color = '#ffffff';
                         } else {
-                            badge.innerText = this.t('badge_pro');
+                            badge.innerText = 'Pro';
                             badge.style.backgroundColor = '#12b886';
+                            badge.style.color = '#ffffff';
                         }
+                    }
+                    if (typeof HeaderKit !== 'undefined') {
+                        HeaderKit.setProStatus(true, detail.isTrial ? ('Pro ' + (detail.remainingHours || 48) + 'h') : 'Pro', detail.isTrial ? 'trial' : 'pro');
                     }
                     if (typeof PresetManager !== 'undefined') PresetManager.updateCounts();
                     return;
@@ -3541,8 +3568,12 @@ const MainController = (() => {
         _proVerifiedState = false;
         this._proTrialInfo = null;
         if (badge) {
-            badge.innerText = this.t('badge_free');
-            badge.style.backgroundColor = '#868e96';
+            badge.innerText = 'Free';
+            badge.style.backgroundColor = '';
+            badge.style.color = '';
+        }
+        if (typeof HeaderKit !== 'undefined') {
+            HeaderKit.setProStatus(false, 'Free', 'free');
         }
         if (typeof PresetManager !== 'undefined') PresetManager.updateCounts();
     },

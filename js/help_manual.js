@@ -1,11 +1,11 @@
 /**
  * js/help_manual.js
- * 5개 국어(KO, EN, ES, ZH, JA) 국제 규격 매뉴얼 및 입열량 가이드 전용 모듈 (v2.3)
+ * 5개 국어(KO, EN, ES, ZH, JA) 국제 규격 매뉴얼 및 입열량 가이드 전용 모듈 (v2.4)
  */
 const HelpManual = {
     dict: {
         ko: {
-            modal_title: "📘 국제 규격 매뉴얼 & 입열량 가이드 (v2.3)",
+            modal_title: "📘 국제 규격 매뉴얼 & 입열량 가이드 (v2.4)",
             title_1: "1. 규격 및 공정 계수 · 입열량 계산 공식",
             formula: "HI = (k × V × A × T) / (L × 1000) (결과 단위: kJ/mm)",
             vars: "• <strong>k</strong>: 규격·공정 열효율 계수 | <strong>V</strong>: 전압 (V) | <strong>A</strong>: 전류 (A) | <strong>T</strong>: 용접 시간 (초) | <strong>L</strong>: 용접 길이 (mm)",
@@ -43,7 +43,7 @@ const HelpManual = {
             legal_3: "3. 본 프로그램을 무단으로 수정, 복제, 역설계(디버깅)하거나 상업적으로 재배포하는 행위를 금지합니다."
         },
         en: {
-            modal_title: "📘 International Standard Manual & Heat Input Guide (v2.3)",
+            modal_title: "📘 International Standard Manual & Heat Input Guide (v2.4)",
             title_1: "1. Standard & Process Factor · Heat Input Formula",
             formula: "HI = (k × V × A × T) / (L × 1000) (Unit: kJ/mm)",
             vars: "• <strong>k</strong>: Thermal efficiency factor | <strong>V</strong>: Voltage (V) | <strong>A</strong>: Amperage (A) | <strong>T</strong>: Time (sec) | <strong>L</strong>: Length (mm)",
@@ -81,7 +81,7 @@ const HelpManual = {
             legal_3: "3. Unauthorized modification, reverse-engineering, debugging, or commercial redistribution of this software is strictly prohibited."
         },
         es: {
-            modal_title: "📘 Manual de Normas Internacionales y Guía de Aporte Térmico (v2.3)",
+            modal_title: "📘 Manual de Normas Internacionales y Guía de Aporte Térmico (v2.4)",
             title_1: "1. Factor de Norma y Proceso · Fórmula de Aporte Térmico",
             formula: "HI = (k × V × A × T) / (L × 1000) (Unidad: kJ/mm)",
             vars: "• <strong>k</strong>: Factor de eficiencia térmica | <strong>V</strong>: Voltaje (V) | <strong>A</strong>: Amperaje (A) | <strong>T</strong>: Tiempo (seg) | <strong>L</strong>: Longitud (mm)",
@@ -119,7 +119,7 @@ const HelpManual = {
             legal_3: "3. Queda prohibida la modificación, ingeniería inversa o redistribución no autorizada de este programa."
         },
         zh: {
-            modal_title: "📘 国际标准手册与热输入计算指南 (v2.3)",
+            modal_title: "📘 国际标准手册与热输入计算指南 (v2.4)",
             title_1: "1. 标准与工艺系数 · 热输入计算公式",
             formula: "HI = (k × V × A × T) / (L × 1000) (结果单位: kJ/mm)",
             vars: "• <strong>k</strong>: 标准/工艺热效率系数 | <strong>V</strong>: 电压 (V) | <strong>A</strong>: 电流 (A) | <strong>T</strong>: 焊接时间 (秒) | <strong>L</strong>: 焊接长度 (mm)",
@@ -157,7 +157,7 @@ const HelpManual = {
             legal_3: "3. 严禁擅自修改、反编译、调试或商业性二次分发本程序。"
         },
         ja: {
-            modal_title: "📘 国際規格マニュアル＆溶接入熱ガイド (v2.3)",
+            modal_title: "📘 国際規格マニュアル＆溶接入熱ガイド (v2.4)",
             title_1: "1. 規格およびプロセス係数・入熱量計算式",
             formula: "HI = (k × V × A × T) / (L × 1000) (単位: kJ/mm)",
             vars: "• <strong>k</strong>: 規格・プロセス熱効率係数 | <strong>V</strong>: 電圧 (V) | <strong>A</strong>: 電流 (A) | <strong>T</strong>: 溶接時間 (秒) | <strong>L</strong>: 溶接長 (mm)",
