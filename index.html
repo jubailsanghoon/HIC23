@@ -4,15 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#ff7f00" />
-    <meta name="application-name" content="HeatInPut Calculator" />
+    <meta name="application-name" content="Heat-Input Calculator" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="HeatInPut Calculator" />
+    <meta name="apple-mobile-web-app-title" content="Heat-Input Calculator" />
     <link id="appManifestLink" rel="manifest" href="manifest.json" />
     <link rel="icon" type="image/svg+xml" href="hi-logo.svg" />
     <link rel="icon" type="image/png" href="hi-logo.png" />
     <link rel="apple-touch-icon" href="hi-logo.png" />
-    <title>Heat Input Calculator Pro 2.4</title>
+    <title>Heat-Input Calculator Pro 2.4</title>
     <script>
         // 카카오톡 인앱 브라우저 감지 시 강제 기본 브라우저(크롬/삼성인터넷/사파리) 탈출 및 바로가기 유도
         (function() {
@@ -79,8 +79,8 @@
             } catch(e){}
         })();
     </script>
-    <link rel="stylesheet" href="shared-header-kit/header-kit.css?v=2.4" />
-    <link rel="stylesheet" href="css/style.css?v=2.4" />
+    <link rel="stylesheet" href="shared-header-kit/header-kit.css?v=2.4.2" />
+    <link rel="stylesheet" href="css/style.css?v=2.4.2" />
 </head>
 <body>
 
@@ -93,7 +93,7 @@
           </div>
           <div class="brand-text">
             <h1 id="appTitle">
-              <span class="title-full">용접 입열량 및 냉각속도 계산기</span>
+              <span class="title-full">용접 입열량 계산기</span>
               <span class="title-short">입열량 계산기</span>
             </h1>
           </div>
@@ -448,14 +448,14 @@
         </section>
 
         <footer class="app-footer">
-            <p>Heat Input Calculator Pro 2.4</p>
+            <p>Heat-Input Calculator Pro 2.4</p>
             <p>Copyright © 2026 ISKorea Solutions. All rights reserved</p>
             <p>contact : isksolution555@gmail.com</p>
         </footer>
     </main>
 
     <!-- 3단계: 공용 헤더 스크립트 연결 및 초기화 -->
-    <script src="shared-header-kit/header-kit.js?v=2.4"></script>
+    <script src="shared-header-kit/header-kit.js?v=2.4.2"></script>
     <script>
       HeaderKit.init({
         version: "v2.4",
@@ -468,11 +468,11 @@
         },
         onLanguageChange: (lang) => {
           const titles = {
-            ko: { full: "용접 입열량 및 냉각속도 계산기", short: "입열량 계산기" },
-            en: { full: "Heat Input & Cooling Rate Calculator", short: "Heat Input Calc" },
-            zh: { full: "焊接热输入与冷却速度计算器", short: "热输入计算器" },
-            ja: { full: "溶接 入熱量・冷却速度 計算機", short: "入熱量 計算機" },
-            es: { full: "Calculadora de Aporte Térmico y Enfriamiento", short: "Calc. Aporte Térmico" }
+            ko: { full: "용접 입열량 계산기", short: "입열량 계산기" },
+            en: { full: "Heat-Input Calculator", short: "Heat-Input Calc" },
+            zh: { full: "焊接热输入计算器", short: "热输入计算器" },
+            ja: { full: "溶接 入熱量 計算機", short: "入熱量 計算機" },
+            es: { full: "Calculadora de Aporte Térmico", short: "Calc. Aporte Térmico" }
           };
           const t = titles[lang] || titles.ko;
           HeaderKit.setTitle(t.full, t.short);
@@ -493,10 +493,10 @@
       });
     </script>
 
-    <script src="js/data_store.js?v=2.4" defer></script>
-    <script src="js/help_manual.js?v=2.4" defer></script>
-    <script src="js/calculator.js?v=2.4" defer></script>
-    <script src="pages/dashboard.js?v=2.4" defer></script>
-    <script src="js/main.js?v=2.4" defer></script>
+    <script src="js/data_store.js?v=2.4.2" defer></script>
+    <script src="js/help_manual.js?v=2.4.2" defer></script>
+    <script src="js/calculator.js?v=2.4.2" defer></script>
+    <script src="pages/dashboard.js?v=2.4.2" defer></script>
+    <script src="js/main.js?v=2.4.2" defer></script>
 </body>
 </html>

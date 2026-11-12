@@ -809,11 +809,11 @@ const MainController = (() => {
         if (typeof HeaderKit !== 'undefined') {
             HeaderKit.setLanguage(lang, false);
             const titles = {
-                ko: { full: "용접 입열량 및 냉각속도 계산기", short: "입열량 계산기" },
-                en: { full: "Heat Input & Cooling Rate Calculator", short: "Heat Input Calc" },
-                zh: { full: "焊接热输入与冷却速度计算器", short: "热输入计算器" },
-                ja: { full: "溶接 入熱量・冷却速度 計算機", short: "入熱量 計算機" },
-                es: { full: "Calculadora de Aporte Térmico y Enfriamiento", short: "Calc. Aporte Térmico" }
+                ko: { full: "용접 입열량 계산기", short: "입열량 계산기" },
+                en: { full: "Heat-Input Calculator", short: "Heat-Input Calc" },
+                zh: { full: "焊接热输入计算器", short: "热输入计算器" },
+                ja: { full: "溶接 入熱量 計算機", short: "入熱量 計算機" },
+                es: { full: "Calculadora de Aporte Térmico", short: "Calc. Aporte Térmico" }
             };
             const t = titles[lang] || titles.ko;
             HeaderKit.setTitle(t.full, t.short);

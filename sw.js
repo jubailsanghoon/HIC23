@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hi-calc-pro-v24-offline-v2';
+const CACHE_NAME = 'hi-calc-pro-v24-offline-v4';
 const CORE_ASSETS = [
     './',
     './index.html',
@@ -25,8 +25,8 @@ const CORE_ASSETS = [
 ];
 
 const SW_MANIFEST_JSON = JSON.stringify({
-    name: "HeatInPut Calculator",
-    short_name: "HeatInPut Calculator",
+    name: "Heat-Input Calculator",
+    short_name: "Heat-Input Calculator",
     description: "Welding Heat Input Calculator v2.4 (Offline-Ready)",
     start_url: "./index.html",
     scope: "./",
