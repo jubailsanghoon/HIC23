@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hi-calc-pro-v24-offline-v4';
+﻿const CACHE_NAME = 'hic-pro-v27-offline-v34';
 const CORE_ASSETS = [
     './',
     './index.html',
@@ -130,3 +130,13 @@ self.addEventListener('fetch', event => {
             )
     );
 });
+
+
+
+
+
+
+
+
+
+

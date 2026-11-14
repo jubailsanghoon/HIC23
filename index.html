@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8" />
@@ -12,7 +12,7 @@
     <link rel="icon" type="image/svg+xml" href="hi-logo.svg" />
     <link rel="icon" type="image/png" href="hi-logo.png" />
     <link rel="apple-touch-icon" href="hi-logo.png" />
-    <title>Heat-Input Calculator Pro 2.4</title>
+    <title>Heat-Input Calculator v2.7</title>
     <script>
         // 카카오톡 인앱 브라우저 감지 시 강제 기본 브라우저(크롬/삼성인터넷/사파리) 탈출 및 바로가기 유도
         (function() {
@@ -27,9 +27,13 @@
                             window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(currentUrl);
                         } catch (err) {}
                     } else {
-                        // Android: Chrome Intent 강제 호출 (카카오톡 창을 닫고 기본 Chrome 브라우저로 강제 점프)
-                        var cleanUrl = currentUrl.replace(/^https?:\/\//i, '');
-                        location.href = 'intent://' + cleanUrl + '#Intent;scheme=https;package=com.android.chrome;end';
+                        // Android: 사용자 기본 브라우저(삼성인터넷, 크롬 등)로 자동 탈출
+                        try {
+                            location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(currentUrl);
+                        } catch (err) {
+                            var cleanUrl = currentUrl.replace(/^https?:\/\//i, '');
+                            location.href = 'intent://' + cleanUrl + '#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
+                        }
                         return;
                     }
                 }
@@ -79,8 +83,8 @@
             } catch(e){}
         })();
     </script>
-    <link rel="stylesheet" href="shared-header-kit/header-kit.css?v=2.4.2" />
-    <link rel="stylesheet" href="css/style.css?v=2.4.2" />
+    <link rel="stylesheet" href="shared-header-kit/header-kit.css?v=2.7.34" />
+    <link rel="stylesheet" href="css/style.css?v=2.7.34" />
 </head>
 <body>
 
@@ -137,7 +141,7 @@
           </div>
 
           <!-- 6. 도움말 버튼 -->
-          <button type="button" class="hdr-btn" id="btnManual" title="도움말">
+          <button type="button" class="hdr-btn" id="btnManual" title="사용 매뉴얼">
             <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           </button>
         </div>
@@ -152,10 +156,10 @@
             <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:900; color:#191919;">기본 브라우저로 열기 안내</h3>
             <p style="font-size:13px; color:#495057; line-height:1.55; margin:0 0 18px 0;">
                 현재 <strong>카카오톡 내부 화면</strong>에서는 보안 정책상 <span style="color:#ff7f00; font-weight:800;">[홈화면에 바로가기 추가]</span> 및 오프라인 저장이 제한됩니다.<br><br>
-                아래 버튼을 눌러 <strong>기본 브라우저(Chrome / Safari)</strong>로 열어주세요!
+                아래 버튼을 눌러 <strong>사용 중인 기본 브라우저</strong>로 열어주세요!
             </p>
             <button type="button" onclick="MainController.escapeKakaoInApp()" style="width:100%; padding:14px; background:#ff7f00; color:#fff; border:none; border-radius:10px; font-size:15px; font-weight:900; cursor:pointer; margin-bottom:10px; box-shadow:0 4px 12px rgba(255,127,0,0.35);">
-                🚀 기본 브라우저로 열기 (Chrome/Safari)
+                🚀 기본 브라우저로 열기
             </button>
             <button type="button" onclick="document.getElementById('kakaoInAppOverlay').style.display='none'" style="background:none; border:none; color:#868e96; font-size:12px; font-weight:700; cursor:pointer; text-decoration:underline;">
                 그냥 여기서 계속 보기
@@ -167,7 +171,7 @@
     <div id="kakaoInAppBanner" class="hidden" style="background:#fee500; border-bottom:2px solid #e6cf00; padding:12px 16px; font-size:12.5px; font-weight:800; color:#191919; display:none; justify-content:space-between; align-items:center; gap:8px;">
         <div style="flex:1; line-height:1.45;">
             💡 <strong>카카오톡 내부 브라우저로 접속 중입니다.</strong><br>
-            홈화면 바로가기 추가 및 오프라인 저장을 위해 <strong>[기본 브라우저(크롬/사파리)]</strong>로 열어주세요.
+            홈화면 바로가기 추가 및 오프라인 저장을 위해 <strong>[기본 브라우저]</strong>로 열어주세요.
         </div>
         <button type="button" onclick="MainController.escapeKakaoInApp()" style="background:#191919; color:#fff; border:none; border-radius:6px; padding:8px 12px; font-size:12px; font-weight:900; cursor:pointer; white-space:nowrap;">
             브라우저로 열기 ↗
@@ -201,19 +205,31 @@
             <section class="outline-card">
                 <div class="small-label" data-i18n="lbl_standard">규격</div>
                 <div class="std-toggle-group">
-                    <button type="button" id="btnStdAWS" class="std-btn" onclick="Calculator.setStandard('AWS')">AWS</button>
+                    <button type="button" id="btnStdAWS" class="std-btn" onclick="Calculator.setStandard('AWS')">AWS/ASME</button>
                     <button type="button" id="btnStdISO" class="std-btn active" onclick="Calculator.setStandard('ISO')">ISO</button>
                 </div>
             </section>
             <section class="outline-card">
                 <div class="small-label" data-i18n="lbl_process">용접 공정</div>
                 <div class="process-select-wrap">
-                    <select id="selProcess" onchange="Calculator.calculate()">
-                        <option value="FCAW">FCAW</option>
-                        <option value="GMAW">GMAW</option>
-                        <option value="SMAW">SMAW</option>
-                        <option value="GTAW">GTAW</option>
-                        <option value="SAW">SAW</option>
+                    <select id="selProcess" onchange="Calculator.onProcessChange ? Calculator.onProcessChange() : Calculator.calculate()">
+                        <optgroup label="기본 공정 (Standard)">
+                            <option value="FCAW">FCAW (Flux-Cored)</option>
+                            <option value="GMAW">GMAW (MIG/MAG)</option>
+                            <option value="SMAW">SMAW (Stick)</option>
+                            <option value="GTAW">GTAW (TIG)</option>
+                            <option value="SAW">SAW (Submerged Arc)</option>
+                        </optgroup>
+                        <optgroup label="🔒 고능률 특수 아크 (PRO)">
+                            <option value="PAW">🔒 PAW (플라즈마 - 15)</option>
+                            <option value="EGW">🔒 EGW (일렉트로가스 - 73)</option>
+                            <option value="ESW">🔒 ESW (일렉트로슬래그 - 72)</option>
+                        </optgroup>
+                        <optgroup label="🔒 첨단 에너지 빔 (PRO)">
+                            <option value="LBW">🔒 LBW (레이저 - 52)</option>
+                            <option value="HLAW">🔒 HLAW (하이브리드 - 521)</option>
+                            <option value="EBW">🔒 EBW (전자빔 - 51)</option>
+                        </optgroup>
                     </select>
                 </div>
             </section>
@@ -239,11 +255,11 @@
                     📄 <span id="wpsCountLbl">목록 보기 (10/10)</span>
                 </button>
                 <div class="preset-action-bar">
-                    <button type="button" class="preset-sub-btn" onclick="PresetManager.openEditor('wps')" data-i18n="btn_edit">편집</button>
+                    <button type="button" class="preset-sub-btn pro-feature-btn" onclick="PresetManager.openEditor('wps')" data-i18n="btn_edit">편집</button>
                     <button type="button" class="preset-sub-btn" onclick="PresetManager.downloadSample('wps')" data-i18n="btn_sample">⬇ 샘플</button>
                     <button type="button" class="preset-sub-btn btn-green" onclick="PresetManager.exportBackup('wps')" data-i18n="btn_backup">⬇ 백업</button>
                     <button type="button" class="preset-sub-btn" onclick="PresetManager.triggerImport('wps')" data-i18n="btn_upload">⬆ 업로드</button>
-                    <button type="button" class="preset-sub-btn btn-orange" onclick="PresetManager.triggerPdfImport('wps')" data-i18n="btn_pdf">PDF</button>
+                    <button type="button" class="preset-sub-btn btn-orange pro-feature-btn" onclick="PresetManager.triggerPdfImport('wps')" data-i18n="btn_pdf">PDF</button>
                 </div>
                 <div id="wpsStepContainer" class="wps-step-box"></div>
             </div>
@@ -364,8 +380,8 @@
                 <div class="mode-pill-group" style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
     <button type="button" id="btnWelderManual" class="mode-pill active" onclick="Calculator.setWelderMode('manual')" data-i18n="btn_manual">수동</button>
     <button type="button" id="btnWelderPreset" class="mode-pill" onclick="Calculator.setWelderMode('preset')" data-i18n="btn_preset">프리셋</button>
-    <button type="button" class="scan-pill" style="background:var(--brand-orange);" onclick="MainController.openScannerModal()" data-i18n="btn_scan">📷 스캔</button>
-    <button type="button" class="scan-pill" style="background:#10b981;" onclick="MainController.openLabelPrintModal()" data-i18n="btn_label_print">🏷️ 라벨인쇄</button>
+    <button type="button" class="scan-pill pro-feature-btn" style="background:var(--brand-orange);" onclick="MainController.openScannerModal()" data-i18n="btn_scan">📷 스캔</button>
+    <button type="button" class="scan-pill pro-feature-btn" style="background:#10b981;" onclick="MainController.openLabelPrintModal()" data-i18n="btn_label_print">🏷️ 라벨인쇄</button>
 </div>
             </div>
 
@@ -374,11 +390,11 @@
                     👤 <span id="welderCountLbl">목록 보기 (10/10)</span>
                 </button>
                 <div class="preset-action-bar">
-                    <button type="button" class="preset-sub-btn" onclick="PresetManager.openEditor('welder')" data-i18n="btn_edit">편집</button>
+                    <button type="button" class="preset-sub-btn pro-feature-btn" onclick="PresetManager.openEditor('welder')" data-i18n="btn_edit">편집</button>
                     <button type="button" class="preset-sub-btn" onclick="PresetManager.downloadSample('welder')" data-i18n="btn_sample">⬇ 샘플</button>
                     <button type="button" class="preset-sub-btn btn-green" onclick="PresetManager.exportBackup('welder')" data-i18n="btn_backup">⬇ 백업</button>
                     <button type="button" class="preset-sub-btn" onclick="PresetManager.triggerImport('welder')" data-i18n="btn_upload">⬆ 업로드</button>
-                    <button type="button" class="preset-sub-btn btn-orange" onclick="PresetManager.triggerPdfImport('welder')" data-i18n="btn_pdf">PDF</button>
+                    <button type="button" class="preset-sub-btn btn-orange pro-feature-btn" onclick="PresetManager.triggerPdfImport('welder')" data-i18n="btn_pdf">PDF</button>
                 </div>
             </div>
 
@@ -409,18 +425,27 @@
             </div>
         </section>
 
+        <div class="save-record-wrap">
+            <button type="button" class="act-btn btn-black btn-save-record" onclick="MainController.saveRecord()">
+                <span class="save-icon">+</span> <span data-i18n="btn_save_data">데이터 저장</span>
+            </button>
+        </div>
         <div class="history-action-row">
-            <button type="button" class="act-btn btn-black" onclick="MainController.saveRecord()">
-                <span>+</span> <span data-i18n="btn_save_data">데이터 저장</span>
+            <button type="button" class="hist-sub-btn" onclick="MainController.toggleHistoryTable()">
+                <span data-i18n="btn_recent_log">최근 이력</span> (<span id="logCount">0</span>)
             </button>
-            <button type="button" class="act-btn btn-outline" onclick="MainController.exportCSV()" data-i18n="btn_export_csv">CSV 내보내기</button>
-            <button type="button" class="act-btn btn-outline-dark" onclick="MainController.toggleHistoryTable()">
-                <span><span data-i18n="btn_recent_log">최근 이력</span> (<span id="logCount">0</span>)</span>
+            <button type="button" id="btnHistoryEditMode" class="hist-sub-btn" onclick="MainController.toggleHistoryEditMode()">
+                <span id="lblHistoryEditMode">✏️ 편집</span>
             </button>
-            <button type="button" id="btnHistoryEditMode" class="act-btn btn-outline-dark" onclick="MainController.toggleHistoryEditMode()">
-                <span id="lblHistoryEditMode">✏️ 편집 모드</span>
+            <button type="button" class="hist-sub-btn btn-orange pro-feature-btn" onclick="MainController.openDailyReportModal()">
+                <span data-i18n="btn_daily_report">📊 일일보고서</span>
             </button>
-            <button type="button" class="act-btn btn-danger-outline" onclick="MainController.clearHistory()" data-i18n="btn_clear_log">이력 삭제</button>
+            <button type="button" class="hist-sub-btn" onclick="MainController.exportCSV()">
+                <span data-i18n="btn_export_csv">CSV</span>
+            </button>
+            <button type="button" class="hist-sub-btn btn-danger-sub" onclick="MainController.clearHistory()">
+                <span data-i18n="btn_clear_log">이력 삭제</span>
+            </button>
         </div>
 
         <section class="table-outline-card">
@@ -455,10 +480,10 @@
     </main>
 
     <!-- 3단계: 공용 헤더 스크립트 연결 및 초기화 -->
-    <script src="shared-header-kit/header-kit.js?v=2.4.2"></script>
+    <script src="shared-header-kit/header-kit.js?v=2.7.34"></script>
     <script>
       HeaderKit.init({
-        version: "v2.4",
+        version: "v2.7",
         isPro: false,
         defaultLang: localStorage.getItem('HI_LANG') || "ko",
         onThemeChange: (theme) => {
@@ -493,10 +518,19 @@
       });
     </script>
 
-    <script src="js/data_store.js?v=2.4.2" defer></script>
-    <script src="js/help_manual.js?v=2.4.2" defer></script>
-    <script src="js/calculator.js?v=2.4.2" defer></script>
-    <script src="pages/dashboard.js?v=2.4.2" defer></script>
-    <script src="js/main.js?v=2.4.2" defer></script>
+    <script src="js/data_store.js?v=2.7.34" defer></script>
+    <script src="js/help_manual.js?v=2.7.34" defer></script>
+    <script src="js/calculator.js?v=2.7.34" defer></script>
+    <script src="pages/dashboard.js?v=2.7.34" defer></script>
+    <script src="js/main.js?v=2.7.34" defer></script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+

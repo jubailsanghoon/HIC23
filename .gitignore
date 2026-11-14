@@ -1,0 +1,22 @@
+# ==========================================
+# [보안] 관리자 전용 및 비공개 폴더 (절대 업로드 금지)
+# ==========================================
+restricted/
+admin_keygen.html
+issue_code.html
+kakao_chatbot_gas.js
+cloudflare_worker_skill.js
+SECURITY_CRITICAL_FILES.md
+PRO_FEATURE_ROADMAP.md
+
+# [기업 에셋 및 개인 실데이터]
+wind-tech-logo-*.svg
+*.bak
+*.tmp
+welder_backup.json
+
+# [OS 및 로컬 환경 파일]
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
