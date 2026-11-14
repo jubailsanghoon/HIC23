@@ -199,7 +199,7 @@ const DataStore = {
             step1_applicant_name: "👤 신청자 성함",
             ph_applicant_name: "예: 홍길동",
             step1_email_label: "✉️ 리딤코드 수신용 이메일 주소",
-            ph_email: "예: jubail@naver.com",
+            ph_email: "예: user@domain.com",
             step1_btn_get: "📩 3초 만에 받기",
             step1_guide: "💡 성함과 이메일을 입력하고 [📩 3초 만에 받기]를 누르시면 전용 리딤코드가 즉시 발송됩니다.",
             step1_spam_notice: "※ 발송 후 메일이 오지 않는다면 반드시 스팸메일함 또는 프로모션 탭을 꼭 확인해 주세요!",
