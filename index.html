@@ -523,6 +523,12 @@
     <script src="js/calculator.js?v=2.7.36" defer></script>
     <script src="pages/dashboard.js?v=2.7.36" defer></script>
     <script src="js/main.js?v=2.7.36" defer></script>
+<script>
+if (!sessionStorage.getItem('iskHit_heat')) {
+  sessionStorage.setItem('iskHit_heat', '1');
+  fetch('https://stats.iskorea.org/hit?app=heat', { method: 'POST', keepalive: true }).catch(() => {});
+}
+</script>
 </body>
 </html>
 
