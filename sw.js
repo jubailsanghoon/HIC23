@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'hic-pro-v27-offline-v36';
+﻿const CACHE_NAME = 'hic-pro-v27-offline-v37';
 const CORE_ASSETS = [
     './',
     './index.html',
