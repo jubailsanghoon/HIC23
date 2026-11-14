@@ -50,6 +50,31 @@ const Calculator = {
         }
     },
 
+    // PRO 전용 특수 및 첨단 공정 정의
+    proProcesses: ['PAW', 'EGW', 'ESW', 'LBW', 'HLAW', 'EBW'],
+
+    onProcessChange: function() {
+        const sel = document.getElementById('selProcess');
+        if (!sel) return;
+        const val = sel.value;
+        const isProProc = this.proProcesses.includes(val);
+        const isPro = (typeof MainController !== 'undefined' && MainController.isPro);
+
+        if (isProProc && !isPro) {
+            const procName = val;
+            const alertMsg = (typeof MainController !== 'undefined' && MainController.t)
+                ? MainController.t('alert_pro_process', { process: procName })
+                : `🔒 [${procName}] 공정은 PRO 버전 전용 특수/첨단 공정입니다.`;
+            alert(alertMsg);
+            if (typeof MainController !== 'undefined' && MainController.openModal) {
+                MainController.openModal('pages/settings.html');
+            }
+            // 무료 기본 공정(FCAW)으로 복구
+            sel.value = 'FCAW';
+        }
+        this.calculate();
+    },
+
     // WPS 번호 및 Pass 문자열에서 'SA'/'SAW' -> 'SAW', 'FC'/'FCAW' -> 'FCAW' 자동 판별 및 상단 Process 동기화
     inferProcessFromWps: function(wpsNo, passName, fallbackProc) {
         const pStr = String(passName || '').toUpperCase();
@@ -163,6 +188,84 @@ const Calculator = {
         this.syncFromMinSec();
     },
 
+    _audioCtx: null,
+    _lastSoundStatus: null,
+    _soundThrottleTimer: null,
+
+    _getAudioContext: function() {
+        if (!this._audioCtx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this._audioCtx = new AudioCtx();
+        }
+        if (this._audioCtx && this._audioCtx.state === 'suspended') {
+            this._audioCtx.resume().catch(() => {});
+        }
+        return this._audioCtx;
+    },
+
+    playJudgmentSound: function(isPass) {
+        // PRO 인증 기기에서만 사운드 출력
+        if (typeof MainController === 'undefined' || !MainController.isPro) return;
+
+        // 판정 결과가 이전과 동일하면 연속 소리 방지
+        const currentStatus = isPass ? 'PASS' : 'FAIL';
+        if (this._lastSoundStatus === currentStatus) return;
+        this._lastSoundStatus = currentStatus;
+
+        // 스테퍼 광클 시 사운드 겹침 완화 (300ms 디바운스/쓰로틀)
+        if (this._soundThrottleTimer) clearTimeout(this._soundThrottleTimer);
+        this._soundThrottleTimer = setTimeout(() => {
+            try {
+                const ctx = this._getAudioContext();
+                if (!ctx) return;
+
+                const now = ctx.currentTime;
+                if (isPass) {
+                    // 합격 (PASS): 부드럽고 상쾌한 2화음 챠임벨 (E5 659.25Hz -> G#5 830.6Hz)
+                    const osc1 = ctx.createOscillator();
+                    const osc2 = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    osc1.type = 'sine';
+                    osc1.frequency.setValueAtTime(659.25, now);
+                    osc2.type = 'sine';
+                    osc2.frequency.setValueAtTime(830.60, now + 0.08);
+
+                    gain.gain.setValueAtTime(0.001, now);
+                    gain.gain.linearRampToValueAtTime(0.18, now + 0.04);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+
+                    osc1.connect(gain);
+                    osc2.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc1.start(now);
+                    osc1.stop(now + 0.15);
+                    osc2.start(now + 0.08);
+                    osc2.stop(now + 0.35);
+                } else {
+                    // 불합격 (FAIL): 묵직하고 주의를 끄는 저음 경고 비프 (310Hz -> 220Hz)
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(310, now);
+                    osc.frequency.exponentialRampToValueAtTime(220, now + 0.22);
+
+                    gain.gain.setValueAtTime(0.001, now);
+                    gain.gain.linearRampToValueAtTime(0.22, now + 0.03);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.28);
+                }
+            } catch (e) {}
+        }, 120);
+    },
+
     calculate: function() {
         const wpsEl = document.getElementById('inpWpsNo');
         const currentWpsVal = wpsEl ? wpsEl.value.trim() : '';
@@ -195,6 +298,9 @@ const Calculator = {
             const isPass = (heatInput >= minWps && heatInput <= maxWps && heatInput > 0);
             banner.classList.toggle('pass', isPass);
             banner.classList.toggle('fail', !isPass);
+            if (heatInput > 0) {
+                this.playJudgmentSound(isPass);
+            }
         }
         if (typeof MainController !== 'undefined' && MainController.saveLastWorkState) {
             MainController.saveLastWorkState();

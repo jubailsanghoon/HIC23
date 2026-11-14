@@ -85,13 +85,24 @@ const MainController = (() => {
         return _pureSha256(ascii);
     };
 
-    const _DEVICE_KEY = 'HI_DEVICE_ID_V23';
+    const _DEVICE_KEY = 'HI_DEVICE_ID_V27';
     const _getDeviceCode = () => {
         try {
+            // 1. 이미 활성화된 PRO 라이선스가 있는 경우 해당 기기번호를 최우선 유지 (기존 활성 사용자 보호)
+            const savedLic = JSON.parse(localStorage.getItem('HI_PRO_LICENSE_V2') || 'null');
+            if (savedLic && savedLic.code && typeof savedLic.code === 'string') {
+                const parts = savedLic.code.split('-');
+                if (parts.length >= 2 && /^[0-9A-Z]{5}$/.test(parts[1]) && !parts[1].startsWith('VIP')) {
+                    localStorage.setItem(_DEVICE_KEY, parts[1]);
+                    return parts[1];
+                }
+            }
+            // 2. 이미 발급되어 저장된 V27 기기번호가 있으면 재사용
             const saved = (localStorage.getItem(_DEVICE_KEY) || '').trim().toUpperCase();
             if (/^[0-9A-Z]{5}$/.test(saved) && !saved.startsWith('VIP')) return saved;
         } catch (e) {}
 
+        // 3. 순수 하드웨어 스펙 기반 100% 결정적(Deterministic) 고유 지문 생성 (브라우저 변경/난수 무관)
         let glRenderer = '';
         try {
             const cnv = document.createElement('canvas');
@@ -102,62 +113,55 @@ const MainController = (() => {
             }
         } catch (e) {}
 
-        const hwRaw = [
-            typeof screen !== 'undefined' ? `${screen.width}x${screen.height}x${screen.colorDepth}` : '',
-            typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1,
-            typeof navigator !== 'undefined' ? `${navigator.platform || ''}|${navigator.hardwareConcurrency || ''}|${navigator.maxTouchPoints || 0}|${navigator.deviceMemory || ''}` : '',
-            glRenderer
-        ].join('||').replace(/[^\x20-\x7E]/g, '');
+        // 화면 회전(가로/세로 모드)에 영향받지 않도록 짧은 축과 긴 축으로 정규화
+        let scrDim = '';
+        try {
+            if (typeof screen !== 'undefined') {
+                const sw = Math.min(screen.width || 0, screen.height || 0);
+                const sh = Math.max(screen.width || 0, screen.height || 0);
+                scrDim = `${sw}x${sh}x${screen.colorDepth || 24}`;
+            }
+        } catch (e) {}
 
-        const hwHash = _pureSha256('HI23_HW_' + hwRaw);
+        const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1).toFixed(2) : '1.00';
+        const navHw = typeof navigator !== 'undefined' ? [
+            navigator.platform || '',
+            navigator.hardwareConcurrency || 4,
+            navigator.maxTouchPoints || 0
+        ].join('|') : '';
+
+        // 캔버스 2D 서브픽셀/GPU 렌더링 핑거프린트
+        let canvasFp = '';
+        try {
+            const c2 = document.createElement('canvas');
+            c2.width = 160; c2.height = 30;
+            const ctx = c2.getContext('2d');
+            if (ctx) {
+                ctx.textBaseline = 'top';
+                ctx.font = '14px Arial, sans-serif';
+                ctx.fillStyle = '#ff7f00';
+                ctx.fillRect(0, 0, 80, 20);
+                ctx.fillStyle = '#12b886';
+                ctx.fillText('HIC-2027', 10, 4);
+                canvasFp = c2.toDataURL();
+            }
+        } catch (e) {}
+
+        const hwRaw = [scrDim, dpr, navHw, glRenderer, canvasFp].join('||');
+        const hwHash = _pureSha256('HIC27_HW_' + hwRaw);
+
+        // 난수(Random)를 완전 배제하고 5자리 모두 하드웨어 해시로부터 추출
         let code = '';
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 5; i++) {
             code += _B32[hwHash[i] & 31];
         }
-        if (code === 'VIP') code = 'V1P';
-
-        const rnd = new Uint32Array(2);
-        if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-            crypto.getRandomValues(rnd);
-            code += _B32[rnd[0] & 31] + _B32[rnd[1] & 31];
-        } else {
-            code += _B32[Math.floor(Math.random() * 32)] + _B32[Math.floor(Math.random() * 32)];
-        }
+        if (code.startsWith('VIP')) code = 'V1P' + code.slice(3);
 
         try { localStorage.setItem(_DEVICE_KEY, code); } catch (e) {}
         return code;
     };
 
-    const _EPOCH_2026_MS = 1767225600000; // 2026-01-01T00:00:00Z
-    const _TR48_DURATION_MS = 48 * 3600 * 1000; // 48시간 (밀리초)
-    const _TR48_ACT_KEY = 'HI_TR48_ACT_MAP_V23';
     const _REVOKED_KEY = 'HI_REVOKED_CODES_V23';
-
-    const _getTr48ActivationMap = () => {
-        try {
-            return JSON.parse(localStorage.getItem(_TR48_ACT_KEY) || '{}') || {};
-        } catch (e) {
-            return {};
-        }
-    };
-
-    const _recordTr48Activation = (rawCode, issuedAtMs) => {
-        try {
-            const map = _getTr48ActivationMap();
-            if (!map[rawCode]) {
-                map[rawCode] = Date.now();
-                localStorage.setItem(_TR48_ACT_KEY, JSON.stringify(map));
-            }
-            const firstAct = Number(map[rawCode]) || Date.now();
-            // 코드 내부 발급시각(issuedAtMs)이 존재하면 그 기준(49h)과 기기 최초 등록시각(48h) 중 더 빠른 만료시각 적용
-            if (issuedAtMs && issuedAtMs > _EPOCH_2026_MS) {
-                return Math.min(firstAct + _TR48_DURATION_MS, issuedAtMs + _TR48_DURATION_MS + 3600000);
-            }
-            return firstAct + _TR48_DURATION_MS;
-        } catch (e) {
-            return Date.now() + _TR48_DURATION_MS;
-        }
-    };
 
     const _isCodeRevoked = rawCode => {
         try {
@@ -168,8 +172,24 @@ const MainController = (() => {
         }
     };
 
+    
+    const _generateDeviceCode = (appPrefix, dev) => {
+        const prefix = appPrefix || 'HEAT';
+        const devCode = (dev || _getDeviceCode()).toUpperCase();
+        const secretCore = _decBytes(_SC_ENC);
+        const maskSalt = _decBytes(_MS_ENC);
+        const saltInput = maskSalt + prefix + devCode;
+        const mask = _pureSha256(saltInput);
+        let g23 = "";
+        for (let i = 0; i < 10; i++) {
+            const idx = _B32.indexOf(secretCore.charAt(i)) ^ (mask[i] & 31);
+            g23 += _B32.charAt(idx);
+        }
+        return `${prefix}-${devCode}-${g23.slice(0, 5)}-${g23.slice(5, 10)}`;
+    };
+
     const _verifyCodeDetailSync = rawCode => {
-        if (!rawCode || !/^(HI40|TR48)-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(rawCode)) {
+        if (!rawCode || !/^([A-Z0-9]{3,5})-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(rawCode)) {
             return { ok: false, reason: 'FORMAT' };
         }
         const parts = rawCode.split('-');
@@ -178,78 +198,29 @@ const MainController = (() => {
         const g23 = parts[2] + parts[3];
         const devCode = _getDeviceCode();
 
+        // 앱 식별자 검증: 본 입열량 계산기에서는 'HEAT' (표준) 및 'HI40' (레거시 호환)만 수용
+        if (prefix !== 'HEAT' && prefix !== 'HI40') {
+            return { ok: false, reason: 'APP_MISMATCH', prefix, codeDevice: g1, currentDevice: devCode };
+        }
+
         try {
             const secretCore = _decBytes(_SC_ENC);
             const maskSalt = _decBytes(_MS_ENC);
 
-            if (prefix === 'HI40') {
-                const mask = _pureSha256(maskSalt + g1);
-                for (let i = 0; i < 10; i++) {
-                    const expectedIdx = _B32.indexOf(secretCore[i]) ^ (mask[i] & 31);
-                    if (_B32[expectedIdx] !== g23[i]) return { ok: false, reason: 'SIGNATURE' };
-                }
-                if (g1 !== devCode && !g1.startsWith('VIP')) {
-                    return { ok: false, reason: 'DEVICE_MISMATCH', codeDevice: g1, currentDevice: devCode };
-                }
-                if (_isCodeRevoked(rawCode)) {
-                    return { ok: false, reason: 'TRIAL_EXPIRED', codeDevice: g1, currentDevice: devCode };
-                }
-                return { ok: true, isTrial: false, reason: 'OK', codeDevice: g1, currentDevice: devCode };
+            // HI40은 레거시 호환 (maskSalt + g1), HEAT는 신규 표준 (maskSalt + 'HEAT' + g1)
+            const saltInput = (prefix === 'HI40') ? (maskSalt + g1) : (maskSalt + 'HEAT' + g1);
+            const mask = _pureSha256(saltInput);
+            for (let i = 0; i < 10; i++) {
+                const expectedIdx = _B32.indexOf(secretCore[i]) ^ (mask[i] & 31);
+                if (_B32[expectedIdx] !== g23[i]) return { ok: false, reason: 'SIGNATURE' };
             }
-
-            // TR48: 48시간 조건부 PRO 코드 (타임스탬프 내장형 T3+S7 또는 상태비저장 S10 모두 지원)
-            const t3 = g23.slice(0, 3);
-            const s7 = g23.slice(3, 10);
-            const maskTs = _pureSha256(maskSalt + 'TR48|' + g1 + '|' + t3);
-            let tsMatch = true;
-            for (let i = 0; i < 7; i++) {
-                const expectedIdx = _B32.indexOf(secretCore[i]) ^ (maskTs[i] & 31);
-                if (_B32[expectedIdx] !== s7[i]) {
-                    tsMatch = false;
-                    break;
-                }
-            }
-
-            let issuedAtMs = 0;
-            if (tsMatch) {
-                const h0 = _B32.indexOf(t3[0]);
-                const h1 = _B32.indexOf(t3[1]);
-                const h2 = _B32.indexOf(t3[2]);
-                if (h0 < 0 || h1 < 0 || h2 < 0) return { ok: false, reason: 'SIGNATURE' };
-                const issueHour = (h0 << 10) | (h1 << 5) | h2;
-                issuedAtMs = _EPOCH_2026_MS + issueHour * 3600000;
-            } else {
-                const maskStatic = _pureSha256(maskSalt + 'TR48_' + g1);
-                for (let i = 0; i < 10; i++) {
-                    const expectedIdx = _B32.indexOf(secretCore[i]) ^ (maskStatic[i] & 31);
-                    if (_B32[expectedIdx] !== g23[i]) return { ok: false, reason: 'SIGNATURE' };
-                }
-            }
-
             if (g1 !== devCode && !g1.startsWith('VIP')) {
                 return { ok: false, reason: 'DEVICE_MISMATCH', codeDevice: g1, currentDevice: devCode };
             }
-
             if (_isCodeRevoked(rawCode)) {
-                return { ok: false, isTrial: true, reason: 'TRIAL_EXPIRED', codeDevice: g1, currentDevice: devCode };
+                return { ok: false, reason: 'REVOKED', codeDevice: g1, currentDevice: devCode };
             }
-
-            const expiresAtMs = _recordTr48Activation(rawCode, issuedAtMs);
-            const nowMs = Date.now();
-            if (nowMs >= expiresAtMs) {
-                return { ok: false, isTrial: true, reason: 'TRIAL_EXPIRED', codeDevice: g1, currentDevice: devCode, expiresAtMs };
-            }
-
-            const remainingHours = Math.max(1, Math.ceil((expiresAtMs - nowMs) / 3600000));
-            return {
-                ok: true,
-                isTrial: true,
-                expiresAtMs,
-                remainingHours,
-                reason: 'OK',
-                codeDevice: g1,
-                currentDevice: devCode
-            };
+            return { ok: true, reason: 'OK', prefix, codeDevice: g1, currentDevice: devCode };
         } catch (e) {
             return { ok: false, reason: 'ERROR' };
         }
@@ -280,7 +251,7 @@ const MainController = (() => {
     STORAGE_LOG_KEY: 'HI_CALC_RECORDS_V2',
     LICENSE_KEY: 'HI_PRO_LICENSE_V2',
     LICENSE_API_URL_KEY: 'HI_LICENSE_API_URL_V23',
-    DEFAULT_LICENSE_API_URL: 'https://script.google.com/macros/s/AKfycbxVvbSmA2Ozm1LfIR9-KVc7aEzpRPC-uChXnPXHzqGHMSxI4_acvt2puRCe-V8JpLA/exec',
+    DEFAULT_LICENSE_API_URL: 'https://script.google.com/macros/s/AKfycbwM6ExFgIRdOUP_POvhSQ1S0C5V9heKiSJ9fyuqKLRrIfy663qhhP8ULKQPk_00F_nFag/exec',
     LAST_WORK_STATE_KEY: 'HI_LAST_WORK_STATE_V23',
     OFFLINE_QUEUE_KEY: 'HI_OFFLINE_SYNC_QUEUE_V23',
     SHORTCUT_PROMPT_KEY: 'HI_SHORTCUT_ADDED_V23_PC_AUTO',
@@ -290,7 +261,6 @@ const MainController = (() => {
     _isRestoringWorkState: false,
     _toastTimer: null,
     _deferredInstallPrompt: null,
-    _proTrialInfo: null,
 
     t: function(key, params) {
         return (typeof DataStore !== 'undefined' && typeof DataStore.t === 'function')
@@ -299,6 +269,9 @@ const MainController = (() => {
     },
 
     init: async function() {
+        if (typeof document !== 'undefined' && document.body) {
+            document.body.classList.toggle('is-free-mode', !_proVerifiedState);
+        }
         this.registerServiceWorker();
         const savedLang = localStorage.getItem('HI_LANG') || 'ko';
         const langSelect = document.getElementById('langSelect');
@@ -358,12 +331,12 @@ const MainController = (() => {
                 alert('Safari(사파리) 브라우저로 접속해 주세요:\n' + url);
             }
         } else {
-            // Android: 카카오톡 전용 외부 브라우저 호출 스킴 및 Intent 스킴 연속 시도
+            // Android: 카카오톡 전용 외부 브라우저 호출 스킴 및 Intent 스킴 연속 시도 (사용자 기본 브라우저 열기)
             try {
                 location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
             } catch (e) {
                 const rawHost = url.replace(/^https?:\/\//i, '');
-                location.href = 'intent://' + rawHost + '#Intent;scheme=https;package=com.android.chrome;end';
+                location.href = 'intent://' + rawHost + '#Intent;scheme=https;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end';
             }
         }
     },
@@ -422,16 +395,40 @@ const MainController = (() => {
 
         this._currentModalType = 'shortcut';
         title.innerText = this.t('shortcut_modal_title');
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 
         body.innerHTML = `
-            <!-- 2번 이미지 안내 테이블에 3번 이미지 바로가기 추가 실행 기능 통합 -->
-            <button type="button" onclick="MainController.triggerAddHomeShortcut()" style="width:100%; text-align:left; background-color:var(--brand-orange); padding:16px 18px; border-radius:10px; color:#fff; font-weight:800; margin-bottom:16px; border:2px solid #ea580c; cursor:pointer; box-shadow:0 4px 12px rgba(255,127,0,0.28); display:block;">
-                <h3 style="margin:0 0 6px 0; font-size:16px; font-weight:900; color:#fff;">📲 ${this.t('shortcut_banner_title')}</h3>
+            <!-- 배너 버튼 -->
+            <button type="button" onclick="MainController.triggerAddHomeShortcut()" style="width:100%; text-align:left; background-color:var(--brand-orange); padding:16px 18px; border-radius:10px; color:#fff; font-weight:800; margin-bottom:14px; border:2px solid #ea580c; cursor:pointer; box-shadow:0 4px 12px rgba(255,127,0,0.28); display:block;">
+                <h3 style="margin:0 0 6px 0; font-size:16px; font-weight:900; color:#fff;">
+                    ${isMobile ? '📲' : '🖥️'} ${this.t('shortcut_banner_title')}
+                </h3>
                 <p style="font-size:12px; font-weight:normal; margin:0; color:#fff; line-height:1.45;">${this.t('shortcut_banner_desc')}</p>
             </button>
 
+            ${!isMobile ? `
+            <!-- PC 전용 바탕화면 바로가기 원클릭 생성 카드 -->
+            <div style="background:#e7f5ff; border:1.5px solid #339af0; border-radius:10px; padding:14px 16px; margin-bottom:14px; color:#1864ab;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:13.5px; font-weight:900; color:#1864ab;">🖥️ PC 바탕화면 바로가기 생성</span>
+                    <span style="font-size:11px; background:#1c7ed6; color:#fff; padding:2px 8px; border-radius:6px; font-weight:800;">Windows / Mac</span>
+                </div>
+                <p style="font-size:12px; margin:0 0 10px 0; line-height:1.5; color:#1971c2;">
+                    아래 버튼을 클릭하면 윈도우 바탕화면 표준 바로가기 파일(<code>.url</code>)이 다운로드됩니다. 다운로드된 파일을 바탕화면으로 옮겨두시면 언제든 더블 클릭으로 <strong>기본 브라우저</strong>에서 즉시 실행됩니다.
+                </p>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" onclick="MainController.downloadPcShortcut('url')" style="flex:1; padding:11px 12px; background:#1c7ed6; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:900; cursor:pointer; box-shadow:0 2px 6px rgba(28,126,214,0.35);">
+                        🖥️ 바탕화면 바로가기 다운로드 (.url)
+                    </button>
+                    <button type="button" onclick="MainController.downloadPcShortcut('html')" style="padding:11px 12px; background:#fff; color:#1c7ed6; border:1.5px solid #1c7ed6; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">
+                        🌐 HTML 실행기 (.html)
+                    </button>
+                </div>
+            </div>
+            ` : ''}
+
             <!-- 오프라인 상태 측정/저장 가능 안내 강조 박스 -->
-            <div style="background:#ecfdf5; border:1.5px solid #10b981; border-radius:10px; padding:14px 16px; margin-bottom:16px; color:#065f46;">
+            <div style="background:#ecfdf5; border:1.5px solid #10b981; border-radius:10px; padding:14px 16px; margin-bottom:14px; color:#065f46;">
                 <div style="font-size:13px; font-weight:900; margin-bottom:6px;">${this.t('shortcut_offline_title')}</div>
                 <div style="font-size:12px; line-height:1.6; font-weight:600;">${this.t('shortcut_offline_desc')}</div>
             </div>
@@ -456,7 +453,7 @@ const MainController = (() => {
     precacheOfflineAssets: async function() {
         try {
             if ('caches' in window && (location.protocol === 'https:' || location.protocol === 'http:')) {
-                const cache = await caches.open('hi-calc-pro-v23-offline-v17');
+                const cache = await caches.open('hic-pro-v27-offline-v12');
                 await cache.addAll([
                     './',
                     './index.html',
@@ -495,21 +492,48 @@ const MainController = (() => {
 </html>`;
     },
 
-    createPcDesktopShortcut: function() {
+    createPcDesktopShortcut: function(type = 'url') {
         try {
-            const htmlContent = this.buildPcLauncherHtml();
-            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            const appUrl = window.location.href.split('#')[0];
+            const iconUrl = new URL('hi-logo.png', appUrl).href;
+            let blob, fileName;
+
+            if (type === 'html') {
+                const htmlContent = this.buildPcLauncherHtml();
+                blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                fileName = 'HeatInPut Calculator.html';
+            } else {
+                // Windows 인터넷 바로가기 (.url) - 기본 브라우저로 자동 실행
+                const urlContent = `[InternetShortcut]\r\nURL=${appUrl}\r\nIconIndex=0\r\nIconFile=${iconUrl}\r\nHotKey=0\r\n[{000214A0-0000-0000-C000-000000000046}]\r\nProp3=19,0\r\n`;
+                blob = new Blob([urlContent], { type: 'application/internet-shortcut;charset=utf-8' });
+                fileName = 'HeatInPut Calculator.url';
+            }
+
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
+            a.style.display = 'none';
             a.href = url;
-            a.download = 'HeatInPut Calculator.html';
+            a.download = fileName;
             document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            setTimeout(() => {
+                try { document.body.removeChild(a); } catch (e) {}
+                URL.revokeObjectURL(url);
+            }, 1000);
             return true;
         } catch (e) {
             return false;
+        }
+    },
+
+    downloadPcShortcut: function(type = 'url') {
+        const ok = this.createPcDesktopShortcut(type);
+        this.saveLastWorkState();
+        this.precacheOfflineAssets();
+        localStorage.setItem(this.SHORTCUT_PROMPT_KEY, 'true');
+        if (ok) {
+            alert(this.t('alert_pc_shortcut_created'));
+            this.showSyncToast(this.t('net_offline_notice'), 'online-synced', 6500);
         }
     },
 
@@ -533,12 +557,17 @@ const MainController = (() => {
         }
         this.saveLastWorkState();
         this.precacheOfflineAssets();
-        if (!nativeInstalled && !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '')) {
-            this.createPcDesktopShortcut();
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+        if (!nativeInstalled && !isMobile) {
+            this.createPcDesktopShortcut('url');
         }
         localStorage.setItem(this.SHORTCUT_PROMPT_KEY, 'true');
         this.closeModal();
-        alert(this.t('alert_shortcut_added'));
+        if (!isMobile) {
+            alert(this.t('alert_pc_shortcut_created'));
+        } else {
+            alert(this.t('alert_shortcut_added'));
+        }
         this.showSyncToast(this.t('net_offline_notice'), 'online-synced', 6500);
     },
 
@@ -796,6 +825,14 @@ const MainController = (() => {
 
     changeLanguage: function(lang) {
         localStorage.setItem('HI_LANG', lang);
+        if (typeof DataStore !== 'undefined' && typeof DataStore.syncSampleWeldersForLang === 'function') {
+            if (DataStore.syncSampleWeldersForLang(lang)) {
+                this._welderPoolCache = null;
+                if (typeof PresetManager !== 'undefined' && typeof PresetManager.updateCounts === 'function') {
+                    PresetManager.updateCounts();
+                }
+            }
+        }
         const dict = DataStore.i18n[lang] || DataStore.i18n.ko;
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
@@ -819,6 +856,18 @@ const MainController = (() => {
             HeaderKit.setTitle(t.full, t.short);
         }
 
+        const btnManual = document.getElementById('btnManual');
+        if (btnManual) {
+            const manualTitles = {
+                ko: "사용 매뉴얼",
+                en: "User Manual",
+                zh: "使用手册",
+                ja: "使用マニュアル",
+                es: "Manual de Usuario"
+            };
+            btnManual.title = manualTitles[lang] || manualTitles.ko;
+        }
+
         const badge = document.getElementById('proBadge');
         if (badge) {
             if (_proVerifiedState) {
@@ -836,6 +885,7 @@ const MainController = (() => {
             PresetManager.updateCounts();
         }
         this.updateNetStatusUI();
+        this.updateProcessSelectUI();
         this.renderHistoryTable();
 
         // 모달이 열려 있는 상태에서 언어를 변경하면 즉시 해당 언어로 갱신
@@ -930,21 +980,25 @@ const MainController = (() => {
             .replace(/>/g, '&gt;');
     },
 
-    buildWelderLookupMap: function() {
+    escapeHtml: function(val) {
+        return this.escapeHtmlAttr(val);
+    },
+
+    buildWelderLookupMap: function(lang = 'ko') {
         const map = new Map();
         const pool = typeof this.getCombinedWelderPool === 'function' ? this.getCombinedWelderPool() : [];
         for (const w of pool) {
             const wid = String(w.id || w.welder_no || '').trim().toUpperCase();
-            if (wid && w.name) map.set(wid, w.name);
+            if (wid) {
+                const name = (lang !== 'ko' && w.alt) ? w.alt : (w.name || w.alt || '');
+                if (name) map.set(wid, name);
+            }
         }
         return map;
     },
 
-    resolveRecordWelderName: function(r, welderMap = null) {
+    resolveRecordWelderName: function(r, welderMap = null, lang = 'ko') {
         if (!r) return '-';
-        if (r.welderName && String(r.welderName).trim() && r.welderName !== '-') {
-            return String(r.welderName).trim();
-        }
         const wid = String(r.welderId || '').trim().toUpperCase();
         if (wid && wid !== '-') {
             if (welderMap) {
@@ -954,10 +1008,17 @@ const MainController = (() => {
                 const matched = this.getCombinedWelderPool().find(
                     w => String(w.id || w.welder_no || '').trim().toUpperCase() === wid
                 );
-                if (matched && matched.name) return matched.name;
+                if (matched) {
+                    if (lang !== 'ko' && matched.alt) return matched.alt;
+                    if (matched.name) return matched.name;
+                }
             }
         }
-        return r.welderName || '-';
+        if (r.welderName && String(r.welderName).trim() && r.welderName !== '-') {
+            if (lang !== 'ko' && r.welderName === '홍길동') return 'Hong Gil-Dong';
+            return String(r.welderName).trim();
+        }
+        return '-';
     },
 
     computeRecordJudgment: function(r, presetsCache = null) {
@@ -1227,7 +1288,7 @@ const MainController = (() => {
             return;
         }
 
-        const processes = ['FCAW', 'GMAW', 'SMAW', 'GTAW', 'SAW'];
+        const processes = ['FCAW', 'GMAW', 'SMAW', 'GTAW', 'SAW', 'PAW', 'EGW', 'ESW', 'LBW', 'HLAW', 'EBW'];
         const standards = ['ISO', 'AWS'];
 
         tbody.innerHTML = list.map((r, idx) => {
@@ -1280,6 +1341,7 @@ const MainController = (() => {
         this.isHistoryEditing = false;
         this.tempHistoryRecords = [];
         this.updateNetStatusUI();
+        this.updateProcessSelectUI();
         this.renderHistoryTable();
     },
 
@@ -1304,8 +1366,877 @@ const MainController = (() => {
     },
 
     // ─────────────────────────────────────────────────────────
-    // 공인 용접사 마스터 풀 (Heat_Input_Calculator_Pro_2_3 기준 86명)
+    // [PRO 전용] 일일 검사 보고서 (Daily Welding Parameter Check Report)
     // ─────────────────────────────────────────────────────────
+    _getDailyReportHeaders: function(lang) {
+        const dict = {
+            ko: ['순번', '일자', '시간', '규격', '공정', 'WPS번호', '패스', '용접사ID', '성명', '소속부서', '조인트No', '전압(V)', '전류(A)', '길이(mm)', '시간(s)', '입열량(kJ/mm)', '판정'],
+            en: ['No', 'Date', 'Time', 'Standard', 'Process', 'WPS No', 'Pass', 'Welder ID', 'Name', 'Dept', 'Joint No', 'Volt(V)', 'Amp(A)', 'Length(mm)', 'Time(s)', 'Heat Input(kJ/mm)', 'Judgment'],
+            es: ['N.º', 'Fecha', 'Hora', 'Norma', 'Proceso', 'N.º WPS', 'Pasada', 'ID Soldador', 'Nombre', 'Depto', 'N.º Junta', 'Volt(V)', 'Amp(A)', 'Long(mm)', 'Tiempo(s)', 'Aporte(kJ/mm)', 'Dictamen'],
+            zh: ['序号', '日期', '时间', '标准', '工艺', 'WPS编号', '层道', '焊工编号', '姓名', '部门', '焊口号', '电压(V)', '电流(A)', '长度(mm)', '时间(秒)', '热输入(kJ/mm)', '判定'],
+            ja: ['番号', '日付', '時間', '規格', 'プロセス', 'WPS番号', 'パス', '溶接士ID', '氏名', '部署', '継手番号', '電圧(V)', '電流(A)', 'ビード長(mm)', '時間(秒)', '入熱量(kJ/mm)', '判定']
+        };
+        return dict[lang] || dict.ko;
+    },
+
+    _getDailyReportI18n: function(lang) {
+        const dict = {
+            ko: {
+                title: '용접 변수 일일 검사 보고서 (Daily Welding Parameter Check Report)',
+                modalTitle: '용접 변수 일일 검사 보고서',
+                projLbl: '프로젝트 / 공사명',
+                inspLbl: '검사원 성명',
+                projPh: '예: HULL 1042 / A-BLOCK',
+                inspPh: '예: 홍길동 (CWI)',
+                projDefault: 'PROJECT-WELD-01',
+                inspDefault: 'QC Inspector',
+                dateLbl: '검사일자:',
+                stdLbl: '규격:',
+                procLbl: '공정:',
+                stdProcLbl: '규격/공정:',
+                rateLbl: '합격률:',
+                kpiTotal: '총 측정 건수',
+                kpiPass: '합격 (Pass)',
+                kpiFail: '불합격 (Fail)',
+                kpiAvgHi: '평균 입열량',
+                passTxt: '합격',
+                failTxt: '불합격',
+                unitCase: '건',
+                inspSign: '검사원 서명 (Inspector Signature)',
+                apprSign: '입회 / 승인자 서명 (Approved By Signature)',
+                filePrefix: 'Welding_Daily_Report',
+                summaryTitle: '용접 변수 일일 검사 보고서',
+                summaryDate: '일자',
+                summaryProj: '프로젝트',
+                summaryInsp: '검사원',
+                summaryStdProc: '규격/공정',
+                summaryResult: '측정 결과',
+                summaryCountFmt: function(tot, p, f, r) { return '총 ' + tot + '건 (합격 ' + p + '건, 불합격 ' + f + '건, 합격률 ' + r + ')'; },
+                summaryAvgHi: '평균 입열량',
+                summaryNotice: '※ Heat-Input Calculator Pro v2.7 공인 일일 검사 보고서',
+                clipboardSuccess: '📋 일일 검사 보고서 요약이 클립보드에 복사되었습니다.\n카카오톡이나 메신저, 이메일에 바로 붙여넣기 하실 수 있습니다.',
+                periodLbl: '보고서 기간',
+                periodDaily: '일간',
+                periodWeekly: '주간',
+                periodMonthly: '월간',
+                titleWeekly: '용접 변수 주간 검사 보고서 (Weekly Welding Parameter Check Report)',
+                titleMonthly: '용접 변수 월간 검사 보고서 (Monthly Welding Parameter Check Report)',
+                modalTitleWeekly: '용접 변수 주간 검사 보고서',
+                modalTitleMonthly: '용접 변수 월간 검사 보고서',
+                filePrefixWeekly: 'Welding_Weekly_Report',
+                filePrefixMonthly: 'Welding_Monthly_Report',
+                emptyPeriod: '선택한 기간에 해당하는 측정 기록이 없습니다.'
+            },
+            en: {
+                title: 'Daily Welding Parameter Check Report',
+                modalTitle: 'Daily Welding Parameter Check Report',
+                projLbl: 'Project / Structure',
+                inspLbl: 'Inspector Name',
+                projPh: 'e.g. HULL 1042 / A-BLOCK',
+                inspPh: 'e.g. John Doe (CWI)',
+                projDefault: 'PROJECT-WELD-01',
+                inspDefault: 'QC Inspector',
+                dateLbl: 'Date:',
+                stdLbl: 'Standard:',
+                procLbl: 'Process:',
+                stdProcLbl: 'Standard / Process:',
+                rateLbl: 'Pass Rate:',
+                kpiTotal: 'Total Records',
+                kpiPass: 'Pass',
+                kpiFail: 'Fail',
+                kpiAvgHi: 'Avg Heat Input',
+                passTxt: 'PASS',
+                failTxt: 'FAIL',
+                unitCase: 'records',
+                inspSign: 'Inspector Signature',
+                apprSign: 'Approved By Signature',
+                filePrefix: 'Welding_Daily_Report',
+                summaryTitle: 'Daily Welding Parameter Check Report',
+                summaryDate: 'Date',
+                summaryProj: 'Project',
+                summaryInsp: 'Inspector',
+                summaryStdProc: 'Standard/Process',
+                summaryResult: 'Results',
+                summaryCountFmt: function(tot, p, f, r) { return 'Total ' + tot + ' (Pass: ' + p + ', Fail: ' + f + ', Rate: ' + r + ')'; },
+                summaryAvgHi: 'Avg Heat Input',
+                summaryNotice: '※ Heat-Input Calculator Pro v2.7 Certified Daily Report',
+                clipboardSuccess: '📋 Daily inspection report summary copied to clipboard.\nYou can paste it directly into email or messengers.',
+                periodLbl: 'Report Period',
+                periodDaily: 'Daily',
+                periodWeekly: 'Weekly',
+                periodMonthly: 'Monthly',
+                titleWeekly: 'Weekly Welding Parameter Check Report',
+                titleMonthly: 'Monthly Welding Parameter Check Report',
+                modalTitleWeekly: 'Weekly Welding Parameter Check Report',
+                modalTitleMonthly: 'Monthly Welding Parameter Check Report',
+                filePrefixWeekly: 'Welding_Weekly_Report',
+                filePrefixMonthly: 'Welding_Monthly_Report',
+                emptyPeriod: 'No measurement records found for the selected period.'
+            },
+            es: {
+                title: 'Informe Diario de Inspección de Soldadura',
+                modalTitle: 'Informe Diario de Inspección de Soldadura',
+                projLbl: 'Proyecto / Estructura',
+                inspLbl: 'Nombre del Inspector',
+                projPh: 'Ej: HULL 1042 / BLOQUE-A',
+                inspPh: 'Ej: Juan Pérez (CWI)',
+                projDefault: 'PROYECTO-WELD-01',
+                inspDefault: 'Inspector QC',
+                dateLbl: 'Fecha:',
+                stdLbl: 'Norma:',
+                procLbl: 'Proceso:',
+                stdProcLbl: 'Norma / Proceso:',
+                rateLbl: 'Tasa de Aprobación:',
+                kpiTotal: 'Total Mediciones',
+                kpiPass: 'Aprobado',
+                kpiFail: 'Rechazado',
+                kpiAvgHi: 'Aporte Térmico Medio',
+                passTxt: 'APROBADO',
+                failTxt: 'RECHAZADO',
+                unitCase: 'reg.',
+                inspSign: 'Firma del Inspector',
+                apprSign: 'Firma del Aprobador / Supervisor',
+                filePrefix: 'Informe_Diario_Soldadura',
+                summaryTitle: 'Informe Diario de Inspección de Soldadura',
+                summaryDate: 'Fecha',
+                summaryProj: 'Proyecto',
+                summaryInsp: 'Inspector',
+                summaryStdProc: 'Norma/Proceso',
+                summaryResult: 'Resultados',
+                summaryCountFmt: function(tot, p, f, r) { return 'Total ' + tot + ' (Aprobados: ' + p + ', Rechazados: ' + f + ', Tasa: ' + r + ')'; },
+                summaryAvgHi: 'Aporte Térmico Medio',
+                summaryNotice: '※ Informe Certificado Heat-Input Calculator Pro v2.7',
+                clipboardSuccess: '📋 Resumen del informe diario copiado al portapapeles.\nPuede pegarlo directamente en correo o mensajería.',
+                periodLbl: 'Período',
+                periodDaily: 'Diario',
+                periodWeekly: 'Semanal',
+                periodMonthly: 'Mensual',
+                titleWeekly: 'Informe Semanal de Inspección de Soldadura',
+                titleMonthly: 'Informe Mensual de Inspección de Soldadura',
+                modalTitleWeekly: 'Informe Semanal de Inspección de Soldadura',
+                modalTitleMonthly: 'Informe Mensual de Inspección de Soldadura',
+                filePrefixWeekly: 'Informe_Semanal_Soldadura',
+                filePrefixMonthly: 'Informe_Mensual_Soldadura',
+                emptyPeriod: 'No hay registros en el período seleccionado.'
+            },
+            zh: {
+                title: '焊接每日检验报告',
+                modalTitle: '焊接每日检验报告',
+                projLbl: '工程 / 项目名称',
+                inspLbl: '检验员姓名',
+                projPh: '例: 船体 1042 / A分段',
+                inspPh: '例: 张伟 (CWI)',
+                projDefault: 'PROJECT-WELD-01',
+                inspDefault: 'QC 检验员',
+                dateLbl: '检验日期:',
+                stdLbl: '标准:',
+                procLbl: '工艺:',
+                stdProcLbl: '标准 / 工艺:',
+                rateLbl: '合格率:',
+                kpiTotal: '总测量次数',
+                kpiPass: '合格',
+                kpiFail: '不合格',
+                kpiAvgHi: '平均热输入',
+                passTxt: '合格',
+                failTxt: '不合格',
+                unitCase: '项',
+                inspSign: '检验员签字',
+                apprSign: '见证人 / 批准人签字',
+                filePrefix: 'Welding_Daily_Report_ZH',
+                summaryTitle: '焊接每日检验报告',
+                summaryDate: '日期',
+                summaryProj: '项目',
+                summaryInsp: '检验员',
+                summaryStdProc: '标准/工艺',
+                summaryResult: '测量结果',
+                summaryCountFmt: function(tot, p, f, r) { return '共 ' + tot + ' 项 (合格: ' + p + ' 项, 不合格: ' + f + ' 项, 合格率: ' + r + ')'; },
+                summaryAvgHi: '平均热输入',
+                summaryNotice: '※ Heat-Input Calculator Pro v2.7 官方每日检验报告',
+                clipboardSuccess: '📋 每日检验报告摘要已复制到剪贴板。\n可直接粘贴至邮件或通讯软件。',
+                periodLbl: '报告周期',
+                periodDaily: '日报',
+                periodWeekly: '周报',
+                periodMonthly: '月报',
+                titleWeekly: '焊接每周检验报告',
+                titleMonthly: '焊接每月检验报告',
+                modalTitleWeekly: '焊接每周检验报告',
+                modalTitleMonthly: '焊接每月检验报告',
+                filePrefixWeekly: 'Welding_Weekly_Report_ZH',
+                filePrefixMonthly: 'Welding_Monthly_Report_ZH',
+                emptyPeriod: '所选时间段内没有测量记录。'
+            },
+            ja: {
+                title: '溶接 日常検査報告書',
+                modalTitle: '溶接 日常検査報告書',
+                projLbl: 'プロジェクト / 工事名',
+                inspLbl: '検査員氏名',
+                projPh: '例: 船体 1042 / Aブロック',
+                inspPh: '例: 山田太郎 (CWI)',
+                projDefault: 'PROJECT-WELD-01',
+                inspDefault: 'QC 検査員',
+                dateLbl: '検査日:',
+                stdLbl: '規格:',
+                procLbl: 'プロセス:',
+                stdProcLbl: '規格 / プロセス:',
+                rateLbl: '合格率:',
+                kpiTotal: '総測定件数',
+                kpiPass: '合格',
+                kpiFail: '不合格',
+                kpiAvgHi: '平均入熱量',
+                passTxt: '合格',
+                failTxt: '不合格',
+                unitCase: '件',
+                inspSign: '検査員署名',
+                apprSign: '立会人 / 承認者署名',
+                filePrefix: 'Welding_Daily_Report_JA',
+                summaryTitle: '溶接 日常検査報告書',
+                summaryDate: '日付',
+                summaryProj: 'プロジェクト',
+                summaryInsp: '検査員',
+                summaryStdProc: '規格/プロセス',
+                summaryResult: '測定結果',
+                summaryCountFmt: function(tot, p, f, r) { return '合計 ' + tot + ' 件 (合格: ' + p + ' 件, 不合格: ' + f + ' 件, 合格率: ' + r + ')'; },
+                summaryAvgHi: '平均入熱量',
+                summaryNotice: '※ Heat-Input Calculator Pro v2.7 公認 日常検査報告書',
+                clipboardSuccess: '📋 日常検査報告書の要約をクリップボードにコピーしました。\nメールやメッセージに貼り付けて共有できます。',
+                periodLbl: '集計期間',
+                periodDaily: '日次',
+                periodWeekly: '週間',
+                periodMonthly: '月間',
+                titleWeekly: '溶接 週間検査報告書',
+                titleMonthly: '溶接 月間検査報告書',
+                modalTitleWeekly: '溶接 週間検査報告書',
+                modalTitleMonthly: '溶接 月間検査報告書',
+                filePrefixWeekly: 'Welding_Weekly_Report_JA',
+                filePrefixMonthly: 'Welding_Monthly_Report_JA',
+                emptyPeriod: '選択した期間に該当する測定記録がありません。'
+            }
+        };
+        return dict[lang] || dict.ko;
+    },
+
+    _reportPeriod: 'daily',
+    _reportRefDate: null,
+
+    _formatLocalDate: function(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    },
+
+    _getReportDateRange: function(period, refStr) {
+        const todayStr = this._formatLocalDate(new Date());
+        const baseStr = /^\d{4}-\d{2}-\d{2}$/.test(refStr || '') ? refStr : todayStr;
+        const [yy, mm, dd] = baseStr.split('-').map(Number);
+        const base = new Date(yy, mm - 1, dd);
+
+        if (period === 'weekly') {
+            const dow = (base.getDay() + 6) % 7;
+            const mon = new Date(yy, mm - 1, dd - dow);
+            const sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
+            const start = this._formatLocalDate(mon);
+            const end = this._formatLocalDate(sun);
+            return { start, end, ref: baseStr, label: `${start} ~ ${end}` };
+        }
+        if (period === 'monthly') {
+            const first = new Date(yy, mm - 1, 1);
+            const last = new Date(yy, mm, 0);
+            const start = this._formatLocalDate(first);
+            const end = this._formatLocalDate(last);
+            return { start, end, ref: baseStr, label: `${baseStr.slice(0, 7)} (${start} ~ ${end})` };
+        }
+        return { start: baseStr, end: baseStr, ref: baseStr, label: baseStr };
+    },
+
+    _getReportMetaByPeriod: function(i18n, period) {
+        if (period === 'weekly') {
+            return {
+                title: i18n.titleWeekly || i18n.title,
+                modalTitle: i18n.modalTitleWeekly || i18n.modalTitle,
+                filePrefix: i18n.filePrefixWeekly || i18n.filePrefix
+            };
+        }
+        if (period === 'monthly') {
+            return {
+                title: i18n.titleMonthly || i18n.title,
+                modalTitle: i18n.modalTitleMonthly || i18n.modalTitle,
+                filePrefix: i18n.filePrefixMonthly || i18n.filePrefix
+            };
+        }
+        return {
+            title: i18n.title,
+            modalTitle: i18n.modalTitle,
+            filePrefix: i18n.filePrefix
+        };
+    },
+
+    _getFilteredReportRecords: function() {
+        const period = this._reportPeriod || 'daily';
+        const range = this._getReportDateRange(period, this._reportRefDate);
+        const all = this.getRecords();
+        const filtered = all.filter(r => {
+            const d = String(r.date || '').slice(0, 10);
+            return d >= range.start && d <= range.end;
+        });
+        return { list: filtered, period, range };
+    },
+
+    setReportPeriod: function(period) {
+        this._reportPeriod = (period === 'weekly' || period === 'monthly') ? period : 'daily';
+        const body = document.getElementById('subPageBody');
+        const title = document.getElementById('subPageTitle');
+        if (!body) return;
+        const projEl = document.getElementById('reportProjectName');
+        const inspEl = document.getElementById('reportInspectorName');
+        const savedProj = projEl ? projEl.value : null;
+        const savedInsp = inspEl ? inspEl.value : null;
+        const lang = localStorage.getItem('HI_LANG') || 'ko';
+        const i18n = this._getDailyReportI18n(lang);
+        if (title) title.innerText = this._getReportMetaByPeriod(i18n, this._reportPeriod).modalTitle;
+        this.renderDailyReportModal(body, null, savedProj, savedInsp);
+    },
+
+    setReportRefDate: function(val) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(val || '')) {
+            this._reportRefDate = val;
+            const body = document.getElementById('subPageBody');
+            if (!body) return;
+            const projEl = document.getElementById('reportProjectName');
+            const inspEl = document.getElementById('reportInspectorName');
+            const savedProj = projEl ? projEl.value : null;
+            const savedInsp = inspEl ? inspEl.value : null;
+            this.renderDailyReportModal(body, null, savedProj, savedInsp);
+        }
+    },
+
+    openDailyReportModal: function() {
+        if (!_proVerifiedState) {
+            alert(this.t('alert_pro_report'));
+            this.openModal('pages/settings.html');
+            return;
+        }
+        const all = this.getRecords();
+        if (all.length === 0) {
+            alert(this.t('msg_empty_log'));
+            return;
+        }
+        if (!this._reportRefDate) {
+            this._reportRefDate = String(all[0].date || '').slice(0, 10) || this._formatLocalDate(new Date());
+        }
+        const lang = localStorage.getItem('HI_LANG') || 'ko';
+        const i18n = this._getDailyReportI18n(lang);
+        const meta = this._getReportMetaByPeriod(i18n, this._reportPeriod);
+        this._currentModalType = 'daily_report';
+        const modal = document.getElementById('subPageModal');
+        const title = document.getElementById('subPageTitle');
+        const body = document.getElementById('subPageBody');
+        if (!modal || !body || !title) return;
+
+        title.innerText = meta.modalTitle;
+        this.renderDailyReportModal(body);
+        modal.classList.remove('hidden');
+    },
+
+    renderDailyReportModal: function(body, _unusedList, savedProj, savedInsp) {
+        const lang = localStorage.getItem('HI_LANG') || 'ko';
+        const i18n = this._getDailyReportI18n(lang);
+        const { list, period, range } = this._getFilteredReportRecords();
+        const presets = (typeof DataStore !== 'undefined' && DataStore.getWpsPresets) ? DataStore.getWpsPresets() : [];
+        const welderMap = this.buildWelderLookupMap(lang);
+
+        let passCount = 0;
+        list.forEach(r => {
+            const j = this.resolveRecordJudgment(r, presets);
+            if (j === '합격' || j === 'OK' || j === 'Passed' || j === 'Pass' || j === this.t('judge_pass')) passCount++;
+        });
+        const failCount = list.length - passCount;
+        const passRate = list.length ? (((passCount / list.length) * 100).toFixed(1) + '%') : '0.0%';
+        const avgHi = list.length ? (list.reduce((acc, r) => acc + (parseFloat(r.result) || 0), 0) / list.length).toFixed(2) : '0.00';
+        const headers = this._getDailyReportHeaders(lang);
+
+        const tableRowsHtml = list.length ? list.map((r, idx) => {
+            const j = this.resolveRecordJudgment(r, presets);
+            const isPass = (j === '합격' || j === 'OK' || j === 'Passed' || j === 'Pass' || j === this.t('judge_pass'));
+            const judgeDisplay = isPass ? i18n.passTxt : i18n.failTxt;
+            const wName = this.resolveRecordWelderName(r, welderMap, lang) || '-';
+            return `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td>${this.escapeHtml(r.date || '')}</td>
+                    <td>${this.escapeHtml(r.time || '')}</td>
+                    <td>${this.escapeHtml(r.std || '')}</td>
+                    <td>${this.escapeHtml(r.process || '')}</td>
+                    <td style="font-weight:800;">${this.escapeHtml(r.wpsNo || '-')}</td>
+                    <td>${this.escapeHtml(r.pass || '-')}</td>
+                    <td>${this.escapeHtml(r.welderId || '-')}</td>
+                    <td>${this.escapeHtml(wName)}</td>
+                    <td>${this.escapeHtml(r.dept || '-')}</td>
+                    <td>${this.escapeHtml(r.jointNo || '-')}</td>
+                    <td>${r.V}</td>
+                    <td>${r.A}</td>
+                    <td>${r.L}</td>
+                    <td>${r.T}</td>
+                    <td style="font-weight:900; color:var(--brand-orange);">${r.result}</td>
+                    <td><span class="${isPass ? 'badge-pass' : 'badge-fail'}">${this.escapeHtml(judgeDisplay)}</span></td>
+                </tr>
+            `;
+        }).join('') : `<tr><td colspan="${headers.length}" style="padding:20px; text-align:center; color:var(--text-muted); font-weight:700;">${this.escapeHtml(i18n.emptyPeriod)}</td></tr>`;
+
+        const projVal = savedProj != null ? savedProj : i18n.projDefault;
+        const inspVal = savedInsp != null ? savedInsp : i18n.inspDefault;
+        const periodBtnStyle = (p) => p === period
+            ? 'background:var(--brand-orange); color:#fff; border:1.5px solid var(--brand-orange); font-weight:900;'
+            : 'background:var(--bg-card); color:var(--text-primary); border:1.5px solid var(--border-strong); font-weight:700;';
+
+        body.innerHTML = `
+            <div class="report-modal-wrap">
+                <div class="report-meta-box">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border-light);">
+                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                            <span style="font-size:12px; font-weight:800; color:var(--text-muted);">🗓️ ${i18n.periodLbl}:</span>
+                            <button type="button" onclick="MainController.setReportPeriod('daily')" style="padding:5px 12px; border-radius:7px; font-size:12px; cursor:pointer; ${periodBtnStyle('daily')}">${i18n.periodDaily}</button>
+                            <button type="button" onclick="MainController.setReportPeriod('weekly')" style="padding:5px 12px; border-radius:7px; font-size:12px; cursor:pointer; ${periodBtnStyle('weekly')}">${i18n.periodWeekly}</button>
+                            <button type="button" onclick="MainController.setReportPeriod('monthly')" style="padding:5px 12px; border-radius:7px; font-size:12px; cursor:pointer; ${periodBtnStyle('monthly')}">${i18n.periodMonthly}</button>
+                        </div>
+                        <input type="date" id="reportRefDate" value="${range.ref}" onchange="MainController.setReportRefDate(this.value)" style="padding:4px 8px; border-radius:7px; border:1.5px solid var(--border-strong); font-size:12px; font-weight:700; background:var(--bg-card); color:var(--text-primary);">
+                    </div>
+                    <div class="report-meta-grid">
+                        <div class="report-meta-item">
+                            <label>${i18n.projLbl}</label>
+                            <input type="text" id="reportProjectName" placeholder="${i18n.projPh}" value="${this.escapeHtmlAttr(projVal)}" />
+                        </div>
+                        <div class="report-meta-item">
+                            <label>${i18n.inspLbl}</label>
+                            <input type="text" id="reportInspectorName" placeholder="${i18n.inspPh}" value="${this.escapeHtmlAttr(inspVal)}" />
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700; color:var(--text-muted); padding-top:6px; flex-wrap:wrap; gap:6px;">
+                        <span>📅 ${i18n.dateLbl} <strong>${range.label}</strong></span>
+                        <span>📐 ${i18n.stdLbl} <strong>${(Calculator.state && Calculator.state.standard) || 'AWS'}</strong> / ${i18n.procLbl} <strong>${(document.getElementById('selProcess') ? document.getElementById('selProcess').value : '') || (Calculator.state && Calculator.state.process) || 'FCAW'}</strong></span>
+                        <span>📈 ${i18n.rateLbl} <strong>${passRate}</strong></span>
+                    </div>
+                </div>
+
+                <div class="report-kpi-row">
+                    <div class="report-kpi-card">
+                        <div class="report-kpi-val kpi-total">${list.length}</div>
+                        <div class="report-kpi-lbl">${i18n.kpiTotal}</div>
+                    </div>
+                    <div class="report-kpi-card">
+                        <div class="report-kpi-val kpi-pass">${passCount}</div>
+                        <div class="report-kpi-lbl">${i18n.kpiPass}</div>
+                    </div>
+                    <div class="report-kpi-card">
+                        <div class="report-kpi-val kpi-fail">${failCount}</div>
+                        <div class="report-kpi-lbl">${i18n.kpiFail}</div>
+                    </div>
+                    <div class="report-kpi-card">
+                        <div class="report-kpi-val" style="color:#228be6;">${avgHi} <span style="font-size:10px;">kJ/mm</span></div>
+                        <div class="report-kpi-lbl">${i18n.kpiAvgHi}</div>
+                    </div>
+                </div>
+
+                <div class="report-table-scroll">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                ${headers.map(h => `<th>${h}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRowsHtml}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="report-sign-block">
+                    <div class="report-sign-grid">
+                        <div>
+                            <div>${i18n.inspSign}</div>
+                            <div class="sign-line"></div>
+                        </div>
+                        <div>
+                            <div>${i18n.apprSign}</div>
+                            <div class="sign-line"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="report-action-btns">
+                    <button type="button" class="report-act-btn btn-rep-excel" onclick="MainController.exportDailyReportExcel()">
+                        ${this.t('btn_export_excel')}
+                    </button>
+                    <button type="button" class="report-act-btn btn-rep-pdf" onclick="MainController.printDailyReportPDF()">
+                        ${this.t('btn_print_pdf')}
+                    </button>
+                    <button type="button" class="report-act-btn btn-rep-share" onclick="MainController.shareDailyReport()">
+                        ${this.t('btn_share_report')}
+                    </button>
+                </div>
+            </div>
+        `;
+    },
+
+    exportDailyReportExcel: function() {
+        const lang = localStorage.getItem('HI_LANG') || 'ko';
+        const i18n = this._getDailyReportI18n(lang);
+        const { list, period, range } = this._getFilteredReportRecords();
+        if (list.length === 0) { alert(i18n.emptyPeriod || this.t('msg_empty_log')); return; }
+        const meta = this._getReportMetaByPeriod(i18n, period);
+        const welderMap = this.buildWelderLookupMap(lang);
+        const presets = (typeof DataStore !== 'undefined' && DataStore.getWpsPresets) ? DataStore.getWpsPresets() : [];
+        const today = range.label;
+        const fileTag = period === 'daily' ? range.start : (period === 'monthly' ? range.start.slice(0, 7) : `${range.start}_${range.end}`);
+        const projEl = document.getElementById('reportProjectName');
+        const inspEl = document.getElementById('reportInspectorName');
+        const projName = (projEl ? projEl.value : '').trim() || '-';
+        const inspName = (inspEl ? inspEl.value : '').trim() || '-';
+        const curStd = (Calculator.state && Calculator.state.standard) || 'AWS';
+        const curProc = (document.getElementById('selProcess') ? document.getElementById('selProcess').value : '') || (Calculator.state && Calculator.state.process) || 'FCAW';
+
+        let passCount = 0;
+        list.forEach(r => {
+            const j = this.resolveRecordJudgment(r, presets);
+            if (j === '합격' || j === 'OK' || j === 'Passed' || j === 'Pass' || j === this.t('judge_pass')) passCount++;
+        });
+        const failCount = list.length - passCount;
+        const passRate = ((passCount / list.length) * 100).toFixed(1) + '%';
+        const avgHi = (list.reduce((acc, r) => acc + (parseFloat(r.result) || 0), 0) / list.length).toFixed(2);
+
+        const titleText = meta.title;
+        const headers = this._getDailyReportHeaders(lang);
+
+        const rowsHtml = list.map((r, idx) => {
+            const j = this.resolveRecordJudgment(r, presets);
+            const isPass = (j === '합격' || j === 'OK' || j === 'Passed' || j === 'Pass' || j === this.t('judge_pass'));
+            const judgeDisplay = isPass ? i18n.passTxt : i18n.failTxt;
+            const wName = this.resolveRecordWelderName(r, welderMap, lang) || '-';
+            const bg = isPass ? '#f0fdf4' : '#fff5f5';
+            const jColor = isPass ? '#166534' : '#991b1b';
+            return `
+                <tr style="background:${bg}; text-align:center;">
+                    <td style="border:1px solid #ccc; padding:6px;">${idx + 1}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${this.escapeHtml(r.date || '')}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${this.escapeHtml(r.time || '')}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${this.escapeHtml(r.std || '')}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${this.escapeHtml(r.process || '')}</td>
+                    <td style="border:1px solid #ccc; padding:6px; font-weight:bold;">${this.escapeHtml(r.wpsNo || '-')}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${this.escapeHtml(r.pass || '-')}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${this.escapeHtml(r.welderId || '-')}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${this.escapeHtml(wName)}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${this.escapeHtml(r.dept || '-')}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${this.escapeHtml(r.jointNo || '-')}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${r.V}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${r.A}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${r.L}</td>
+                    <td style="border:1px solid #ccc; padding:6px;">${r.T}</td>
+                    <td style="border:1px solid #ccc; padding:6px; font-weight:bold; color:#d9480f;">${r.result}</td>
+                    <td style="border:1px solid #ccc; padding:6px; font-weight:bold; color:${jColor};">${this.escapeHtml(judgeDisplay)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const excelHtml = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head>
+                <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+                <!--[if gte mso 9]>
+                <xml>
+                    <x:ExcelWorkbook>
+                        <x:ExcelWorksheets>
+                            <x:ExcelWorksheet>
+                                <x:Name>Daily_Report</x:Name>
+                                <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+                            </x:ExcelWorksheet>
+                        </x:ExcelWorksheets>
+                    </x:ExcelWorkbook>
+                </xml>
+                <![endif]-->
+                <style>
+                    body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+                    th { background-color: #212529; color: #ffffff; border: 1px solid #000; padding: 8px; font-weight: bold; }
+                </style>
+            </head>
+            <body>
+                <table style="width:100%; border-collapse:collapse;">
+                    <tr>
+                        <td colspan="17" style="font-size:18pt; font-weight:bold; text-align:center; padding:15px; background:#fff3e6; color:#d9480f; border:1px solid #ffa94d;">
+                            ${titleText}
+                        </td>
+                    </tr>
+                    <tr><td colspan="17" style="height:10px;"></td></tr>
+                    <tr style="font-weight:bold; background:#f8f9fa;">
+                        <td colspan="4" style="border:1px solid #dee2e6; padding:6px;">📅 ${i18n.dateLbl} ${today}</td>
+                        <td colspan="5" style="border:1px solid #dee2e6; padding:6px;">🏗️ ${i18n.projLbl}: ${this.escapeHtml(projName)}</td>
+                        <td colspan="4" style="border:1px solid #dee2e6; padding:6px;">👤 ${i18n.inspLbl}: ${this.escapeHtml(inspName)}</td>
+                        <td colspan="4" style="border:1px solid #dee2e6; padding:6px;">📐 ${i18n.stdProcLbl} ${curStd} / ${curProc}</td>
+                    </tr>
+                    <tr style="font-weight:bold; background:#e7f5ff;">
+                        <td colspan="4" style="border:1px solid #dee2e6; padding:6px;">${i18n.kpiTotal}: ${list.length} ${i18n.unitCase}</td>
+                        <td colspan="4" style="border:1px solid #dee2e6; padding:6px; color:#2b8a3e;">${i18n.kpiPass}: ${passCount}</td>
+                        <td colspan="4" style="border:1px solid #dee2e6; padding:6px; color:#c92a2a;">${i18n.kpiFail}: ${failCount}</td>
+                        <td colspan="3" style="border:1px solid #dee2e6; padding:6px; color:#1864ab;">${i18n.rateLbl} ${passRate}</td>
+                        <td colspan="2" style="border:1px solid #dee2e6; padding:6px;">${i18n.kpiAvgHi}: ${avgHi} kJ/mm</td>
+                    </tr>
+                    <tr><td colspan="17" style="height:10px;"></td></tr>
+                    <tr style="background:#212529; color:#fff; text-align:center;">
+                        ${headers.map(h => `<th style="background:#212529; color:#fff; border:1px solid #495057; padding:8px;">${h}</th>`).join('')}
+                    </tr>
+                    ${rowsHtml}
+                    <tr><td colspan="17" style="height:15px;"></td></tr>
+                    <tr>
+                        <td colspan="8" style="border:1px solid #000; padding:15px; font-weight:bold; height:60px; vertical-align:top;">
+                            ${i18n.inspSign}:<br><br>____________________________________
+                        </td>
+                        <td colspan="9" style="border:1px solid #000; padding:15px; font-weight:bold; height:60px; vertical-align:top;">
+                            ${i18n.apprSign}:<br><br>____________________________________
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
+        `;
+
+        try {
+            const blob = new Blob(['\uFEFF' + excelHtml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `${meta.filePrefix}_${fileTag}.xls`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                try { document.body.removeChild(a); } catch (e) {}
+                URL.revokeObjectURL(url);
+            }, 1000);
+        } catch (e) {
+            alert(e.message || 'Excel export error');
+        }
+    },
+
+    printDailyReportPDF: function() {
+        const lang = localStorage.getItem('HI_LANG') || 'ko';
+        const i18n = this._getDailyReportI18n(lang);
+        const { list, period, range } = this._getFilteredReportRecords();
+        if (list.length === 0) { alert(i18n.emptyPeriod || this.t('msg_empty_log')); return; }
+        const meta = this._getReportMetaByPeriod(i18n, period);
+        const welderMap = this.buildWelderLookupMap(lang);
+        const presets = (typeof DataStore !== 'undefined' && DataStore.getWpsPresets) ? DataStore.getWpsPresets() : [];
+        const today = range.label;
+        const projEl = document.getElementById('reportProjectName');
+        const inspEl = document.getElementById('reportInspectorName');
+        const projName = (projEl ? projEl.value : '').trim() || '-';
+        const inspName = (inspEl ? inspEl.value : '').trim() || '-';
+        const curStd = (Calculator.state && Calculator.state.standard) || 'AWS';
+        const curProc = (document.getElementById('selProcess') ? document.getElementById('selProcess').value : '') || (Calculator.state && Calculator.state.process) || 'FCAW';
+
+        let passCount = 0;
+        list.forEach(r => {
+            const j = this.resolveRecordJudgment(r, presets);
+            if (j === '합격' || j === 'OK' || j === 'Passed' || j === 'Pass' || j === this.t('judge_pass')) passCount++;
+        });
+        const failCount = list.length - passCount;
+        const passRate = ((passCount / list.length) * 100).toFixed(1) + '%';
+        const avgHi = (list.reduce((acc, r) => acc + (parseFloat(r.result) || 0), 0) / list.length).toFixed(2);
+
+        const titleText = meta.title;
+        const headers = this._getDailyReportHeaders(lang);
+
+        const rowsHtml = list.map((r, idx) => {
+            const j = this.resolveRecordJudgment(r, presets);
+            const isPass = (j === '합격' || j === 'OK' || j === 'Passed' || j === 'Pass' || j === this.t('judge_pass'));
+            const judgeDisplay = isPass ? i18n.passTxt : i18n.failTxt;
+            const wName = this.resolveRecordWelderName(r, welderMap, lang) || '-';
+            const bg = isPass ? '' : 'background:#fff5f5;';
+            const jColor = isPass ? '#2b8a3e' : '#c92a2a';
+            return `
+                <tr style="${bg}">
+                    <td>${idx + 1}</td>
+                    <td>${this.escapeHtml(r.date || '')}</td>
+                    <td>${this.escapeHtml(r.time || '')}</td>
+                    <td>${this.escapeHtml(r.std || '')}</td>
+                    <td>${this.escapeHtml(r.process || '')}</td>
+                    <td style="font-weight:bold;">${this.escapeHtml(r.wpsNo || '-')}</td>
+                    <td>${this.escapeHtml(r.pass || '-')}</td>
+                    <td>${this.escapeHtml(r.welderId || '-')}</td>
+                    <td>${this.escapeHtml(wName)}</td>
+                    <td>${this.escapeHtml(r.dept || '-')}</td>
+                    <td>${this.escapeHtml(r.jointNo || '-')}</td>
+                    <td>${r.V}</td>
+                    <td>${r.A}</td>
+                    <td>${r.L}</td>
+                    <td>${r.T}</td>
+                    <td style="font-weight:bold; color:#e8590c;">${r.result}</td>
+                    <td style="font-weight:bold; color:${jColor};">${this.escapeHtml(judgeDisplay)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const printHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>${titleText} - ${today}</title>
+                <style>
+                    @page { size: A4 landscape; margin: 10mm; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 8.5pt; color: #212529; margin: 0; padding: 0; }
+                    .header-title { font-size: 14pt; font-weight: 900; text-align: center; margin-bottom: 8px; color: #d9480f; border-bottom: 2px solid #fd7e14; padding-bottom: 4px; }
+                    .meta-bar { display: flex; justify-content: space-between; font-size: 8pt; margin-bottom: 6px; padding: 4px 8px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; }
+                    .kpi-bar { display: flex; justify-content: space-around; background: #e7f5ff; border: 1px solid #74c0fc; border-radius: 4px; padding: 4px 6px; margin-bottom: 8px; text-align: center; }
+                    .kpi-item .val { font-size: 11pt; font-weight: 800; }
+                    .kpi-item .lbl { font-size: 7pt; color: #495057; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+                    th, td { border: 1px solid #ced4da; padding: 3px 4px; text-align: center; font-size: 7.5pt; }
+                    th { background: #343a40; color: #fff; font-weight: 700; }
+                    tr:nth-child(even) { background: #fafafa; }
+                    .sign-box { display: flex; justify-content: space-between; gap: 16px; margin-top: 10px; page-break-inside: avoid; }
+                    .sign-col { flex: 1; border: 1px solid #333; border-radius: 4px; padding: 8px; height: 55px; }
+                    .sign-col-title { font-weight: 800; font-size: 8pt; margin-bottom: 22px; }
+                    .sign-col-line { border-bottom: 1px solid #555; width: 80%; }
+                </style>
+            </head>
+            <body>
+                <div class="header-title">${titleText}</div>
+                <div class="meta-bar">
+                    <span>📅 <strong>${i18n.dateLbl}</strong> ${today}</span>
+                    <span>🏗️ <strong>${i18n.projLbl}:</strong> ${this.escapeHtml(projName)}</span>
+                    <span>👤 <strong>${i18n.inspLbl}:</strong> ${this.escapeHtml(inspName)}</span>
+                    <span>📐 <strong>${i18n.stdProcLbl}</strong> ${curStd} / ${curProc}</span>
+                </div>
+                <div class="kpi-bar">
+                    <div class="kpi-item"><div class="val">${list.length}</div><div class="lbl">${i18n.kpiTotal}</div></div>
+                    <div class="kpi-item"><div class="val" style="color:#2b8a3e;">${passCount}</div><div class="lbl">${i18n.kpiPass}</div></div>
+                    <div class="kpi-item"><div class="val" style="color:#c92a2a;">${failCount}</div><div class="lbl">${i18n.kpiFail}</div></div>
+                    <div class="kpi-item"><div class="val" style="color:#1864ab;">${passRate}</div><div class="lbl">${i18n.rateLbl}</div></div>
+                    <div class="kpi-item"><div class="val" style="color:#e8590c;">${avgHi} <span style="font-size:7pt;">kJ/mm</span></div><div class="lbl">${i18n.kpiAvgHi}</div></div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+                <div class="sign-box">
+                    <div class="sign-col">
+                        <div class="sign-col-title">${i18n.inspSign}</div>
+                        <div class="sign-col-line"></div>
+                    </div>
+                    <div class="sign-col">
+                        <div class="sign-col-title">${i18n.apprSign}</div>
+                        <div class="sign-col-line"></div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const printWin = window.open('', '_blank', 'width=1100,height=800');
+        if (printWin) {
+            printWin.document.open();
+            printWin.document.write(printHtml);
+            printWin.document.close();
+            setTimeout(() => {
+                printWin.focus();
+                printWin.print();
+            }, 300);
+        } else {
+            window.print();
+        }
+    },
+
+    shareDailyReport: async function() {
+        const lang = localStorage.getItem('HI_LANG') || 'ko';
+        const i18n = this._getDailyReportI18n(lang);
+        const { list, period, range } = this._getFilteredReportRecords();
+        if (list.length === 0) { alert(i18n.emptyPeriod || this.t('msg_empty_log')); return; }
+        const meta = this._getReportMetaByPeriod(i18n, period);
+        const presets = (typeof DataStore !== 'undefined' && DataStore.getWpsPresets) ? DataStore.getWpsPresets() : [];
+        const welderMap = this.buildWelderLookupMap(lang);
+        const today = range.label;
+        const fileTag = period === 'daily' ? range.start : (period === 'monthly' ? range.start.slice(0, 7) : `${range.start}_${range.end}`);
+        const projEl = document.getElementById('reportProjectName');
+        const inspEl = document.getElementById('reportInspectorName');
+        const projName = (projEl ? projEl.value : '').trim() || (lang === 'ko' ? '용접 검사' : 'Welding Inspection');
+        const inspName = (inspEl ? inspEl.value : '').trim() || '-';
+        const curStd = (Calculator.state && Calculator.state.standard) || 'AWS';
+        const curProc = (document.getElementById('selProcess') ? document.getElementById('selProcess').value : '') || (Calculator.state && Calculator.state.process) || 'FCAW';
+
+        let passCount = 0;
+        list.forEach(r => {
+            const j = this.resolveRecordJudgment(r, presets);
+            if (j === '합격' || j === 'OK' || j === 'Passed' || j === 'Pass' || j === this.t('judge_pass')) passCount++;
+        });
+        const failCount = list.length - passCount;
+        const passRate = ((passCount / list.length) * 100).toFixed(1) + '%';
+        const avgHi = (list.reduce((acc, r) => acc + (parseFloat(r.result) || 0), 0) / list.length).toFixed(2);
+
+        const summaryText = '[' + meta.modalTitle + ']\n' +
+            '• ' + i18n.summaryDate + ': ' + today + '\n' +
+            '• ' + i18n.summaryProj + ': ' + projName + '\n' +
+            '• ' + i18n.summaryInsp + ': ' + inspName + '\n' +
+            '• ' + i18n.summaryStdProc + ': ' + curStd + ' / ' + curProc + '\n' +
+            '• ' + i18n.summaryResult + ': ' + i18n.summaryCountFmt(list.length, passCount, failCount, passRate) + '\n' +
+            '• ' + i18n.summaryAvgHi + ': ' + avgHi + ' kJ/mm\n\n' +
+            i18n.summaryNotice;
+
+        if (navigator.share) {
+            try {
+                const headers = this._getDailyReportHeaders(lang);
+                const csvEsc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+                const rows = list.map((r, idx) => {
+                    const j = this.resolveRecordJudgment(r, presets);
+                    const isPass = (j === '합격' || j === 'OK' || j === 'Passed' || j === 'Pass' || j === this.t('judge_pass'));
+                    const judgeDisplay = isPass ? i18n.passTxt : i18n.failTxt;
+                    return [idx + 1, r.date, r.time, r.std, r.process, csvEsc(r.wpsNo), csvEsc(r.pass), csvEsc(r.welderId), csvEsc(this.resolveRecordWelderName(r, welderMap, lang)), csvEsc(r.dept), csvEsc(r.jointNo), r.V, r.A, r.L, r.T, r.result, csvEsc(judgeDisplay)].join(',');
+                });
+                const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+
+                let sharedWithFile = false;
+                try {
+                    const file = new File([csvContent], `${meta.filePrefix}_${fileTag}.csv`, { type: 'text/csv' });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            title: `${meta.modalTitle} (${today})`,
+                            text: summaryText,
+                            files: [file]
+                        });
+                        sharedWithFile = true;
+                    }
+                } catch (fe) {}
+
+                if (!sharedWithFile) {
+                    await navigator.share({
+                        title: `${meta.modalTitle} (${today})`,
+                        text: summaryText
+                    });
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    this._copyReportToClipboard(summaryText, i18n);
+                }
+            }
+        } else {
+            this._copyReportToClipboard(summaryText, i18n);
+        }
+    },
+
+    _copyReportToClipboard: function(text, i18n = null) {
+        const lang = localStorage.getItem('HI_LANG') || 'ko';
+        const reportI18n = i18n || this._getDailyReportI18n(lang);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert(reportI18n.clipboardSuccess);
+            }).catch(() => { alert(text); });
+        } else {
+            alert(text);
+        }
+    },
+
     certWelders: [
         {"welder_no":"YU-WQT-007","name":"한영우","alt":"Han Yeong-U","dept":"Welder - FCAW(136)"},
         {"welder_no":"YU-WQT-008","name":"김민수","alt":"Gim Min-Su","dept":"Welder - FCAW(136)"},
@@ -3331,7 +4262,7 @@ const MainController = (() => {
             if (typeof HelpManual !== 'undefined') {
                 HelpManual.renderModal(lang, title, body);
             } else {
-                title.innerText = '📘 국제 규격 매뉴얼 & 입열량 가이드 (v2.4)';
+                title.innerText = '📘 사용 매뉴얼';
                 body.innerHTML = `<div style="padding:20px;">js/help_manual.js 파일을 로드해 주세요.</div>`;
             }
             modal.classList.remove('hidden');
@@ -3374,54 +4305,88 @@ const MainController = (() => {
                     </ul>
                 </div>
 
-                <!-- 3단계 신청 절차 및 카카오 채널(QR · 링크 방문 -> 공지 확인 -> 채널 내 1:1 채팅) 안내 -->
-                <div style="border: 1.5px solid var(--border-strong); border-radius: 10px; padding: 16px; margin-bottom: 20px; background:var(--bg-card);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
-                        <h4 style="margin:0; font-size:13px; color:var(--text-primary); display:flex; align-items:center; gap:6px;">${this.t('settings_step_title')}</h4>
-                        <span style="background:#111; color:#fff; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:900;">${this.t('settings_step_badge')}</span>
+                <!-- 📱 원스톱 3단계 신청 & 활성화 카드 -->
+                <!-- 1단계: 📧 신청자 정보 (기기번호 + 성함 + 이메일) 및 3초 발급 -->
+                <div style="background:#e7f5ff; border:1.5px solid #74c0fc; border-radius:12px; padding:14px; margin-bottom:14px;">
+                    <div style="font-size:13px; font-weight:900; color:#1864ab; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+                        <span>📧</span> <strong>${this.t('step1_title')}</strong>
                     </div>
 
-                    <div style="background:var(--bg-soft); padding:12px; border-radius:8px; border:1px solid var(--border-light); margin-bottom:12px; font-size:12px; line-height:1.6; color:var(--text-primary);">
-                        <div>${this.t('settings_step_1', { dev: devCode })}</div>
-                        <div>${this.t('settings_step_2', { dev: devCode })}</div>
-                        <div>${this.t('settings_step_3', { dev: devCode })}</div>
-                    </div>
-
-                    <!-- 카카오 채널 QR 코드 및 채널 홈 바로가기 박스 -->
-                    <div style="display:flex; align-items:center; gap:14px; background:var(--bg-soft); border:1px dashed var(--border-strong); border-radius:10px; padding:12px; margin-bottom:12px; flex-wrap:wrap;">
-                        <a href="https://pf.kakao.com/_hALxeX" target="_blank" rel="noopener" onclick="MainController.copyMyDeviceCode(false);" title="https://pf.kakao.com/_hALxeX" style="display:block; flex-shrink:0; background:#fff; padding:4px; border-radius:10px; border:1px solid #dee2e6; box-shadow:0 2px 6px rgba(0,0,0,0.06);">
-                            <img src="kakao-channel-qr.svg" alt="Kakao Channel QR" style="width:96px; height:96px; display:block; border-radius:6px;">
-                        </a>
-                        <div style="flex:1; min-width:180px; font-size:12px; line-height:1.5; color:var(--text-primary);">
-                            <div style="font-weight:900; font-size:13px; margin-bottom:4px; color:var(--text-primary);">${this.t('kakao_qr_title')}</div>
-                            <div style="color:var(--text-muted); margin-bottom:6px;">${this.t('kakao_qr_desc')}</div>
-                            <div style="font-family:monospace; font-size:11px; font-weight:800;">
-                                🔗 <a href="https://pf.kakao.com/_hALxeX" target="_blank" rel="noopener" style="color:var(--brand-orange); text-decoration:underline;">https://pf.kakao.com/_hALxeX</a>
-                            </div>
+                    <!-- 2열 그리드: 기기번호(자동감지) + 신청자 성함 -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                        <div>
+                            <label style="display:block; font-size:11.5px; font-weight:800; color:#495057; margin-bottom:4px;">
+                                ${this.t('step1_my_dev')}
+                            </label>
+                            <input type="text" id="myDevDisplay" value="${devCode}" readonly style="width:100%; padding:10px; font-family:monospace; font-size:16px; font-weight:900; color:var(--brand-orange); background:#f8f9fa; border:1.5px solid #ced4da; border-radius:8px; text-align:center; box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11.5px; font-weight:800; color:#495057; margin-bottom:4px;">
+                                ${this.t('step1_applicant_name')} <span style="color:#e03131;">*</span>
+                            </label>
+                            <input type="text" id="proRegName" value="${prevNameVal}" placeholder="${this.t('ph_applicant_name')}" style="width:100%; padding:10px; font-size:13px; font-weight:700; border:1.5px solid #adb5bd; border-radius:8px; outline:none; background:#fff; box-sizing:border-box;">
                         </div>
                     </div>
 
-                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                        <button type="button" style="flex:1; min-width:210px; background:#FEE500; color:#191919; border:none; border-radius:8px; padding:12px; font-size:13px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;" onclick="MainController.copyMyDeviceCode(true)">
-                            ${this.t('btn_kakao_apply')}
-                        </button>
-                        <button type="button" style="background:var(--bg-card); color:var(--text-primary); border:1.5px solid var(--border-strong); border-radius:8px; padding:10px 14px; font-size:12px; font-weight:800; cursor:pointer;" onclick="navigator.clipboard.writeText('https://pf.kakao.com/_hALxeX'); alert(MainController.t('alert_link_copied'));">
-                            ${this.t('btn_copy_link')}
-                        </button>
+                    <!-- 이메일 입력 및 3초 발급 버튼 -->
+                    <div>
+                        <label style="display:block; font-size:11.5px; font-weight:800; color:#495057; margin-bottom:4px;">
+                            ${this.t('step1_email_label')} <span style="color:#e03131;">*</span>
+                        </label>
+                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                            <input type="email" id="emailApplyInput" placeholder="${this.t('ph_email')}" style="flex:1; min-width:180px; padding:10px 12px; font-size:13px; font-weight:700; border:1.5px solid #adb5bd; border-radius:8px; outline:none; background:#fff; box-sizing:border-box;">
+                            <button type="button" id="btnApplyEmail" onclick="MainController.applyByEmail()" style="background:#1864ab; color:#fff; border:none; border-radius:8px; padding:10px 16px; font-size:13px; font-weight:900; cursor:pointer; white-space:nowrap; box-shadow:0 2px 6px rgba(24,100,171,0.25); transition:all 0.2s ease;">
+                                ${this.t('step1_btn_get')}
+                            </button>
+                        </div>
+                        <div id="emailApplyStatus" style="margin-top:10px;">
+                            <div style="background:#f8f9fa; border:1px solid #ced4da; border-radius:8px; padding:10px 12px; font-size:12px; line-height:1.5;">
+                                <div style="color:#495057; font-weight:700;">
+                                    ${this.t('step1_guide')}
+                                </div>
+                                <div style="color:#e03131; font-size:11.5px; margin-top:4px; font-weight:700;">
+                                    ${this.t('step1_spam_notice')}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div style="margin-bottom:16px;">
-                    <label style="display:block; font-size:12px; font-weight:700; color:var(--text-primary); margin-bottom:6px;">${this.t('lbl_reg_name')} <span style="color:#e03131;">${this.t('lbl_reg_required')}</span></label>
-                    <input type="text" id="proRegName" class="full-input" value="${prevNameVal}" placeholder="${this.escapeHtmlAttr(this.t('ph_reg_name', { dev: devCode }))}">
+                <!-- 2단계: ☕ 후원 링크 선택 (카카오페이 & Buy Me a Coffee) -->
+                <div style="border:1.5px solid var(--border-strong); border-radius:12px; padding:14px; margin-bottom:14px; background:var(--bg-card);">
+                    <div style="font-size:13px; font-weight:900; color:var(--text-primary); margin-bottom:8px;">
+                        ${this.t('step2_title')}
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                        <a href="https://qr.kakaopay.com/FLfFztgIX" target="_blank" rel="noopener" style="display:flex; align-items:center; justify-content:center; gap:6px; background:#FEE500; color:#191919; text-decoration:none; padding:12px 8px; border-radius:8px; font-size:13px; font-weight:900; border:1.5px solid #e6cf00;">
+                            ${this.t('step2_kakaopay')}
+                        </a>
+                        <a href="https://buymeacoffee.com/iskorea" target="_blank" rel="noopener" style="display:flex; align-items:center; justify-content:center; gap:6px; background:#FFDD00; color:#000000; text-decoration:none; padding:12px 8px; border-radius:8px; font-size:13px; font-weight:900; border:1.5px solid #ebd000;">
+                            ${this.t('step2_buymeacoffee')}
+                        </a>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-soft); padding:8px 12px; border-radius:8px; font-size:11.5px; border:1px solid var(--border-light);">
+                        <span style="color:var(--text-muted);">${this.t('step2_inquiry')}</span>
+                        <a href="https://pf.kakao.com/_hALxeX" target="_blank" rel="noopener" style="color:var(--brand-orange); font-weight:800; text-decoration:underline;">${this.t('step2_kakao_chat')}</a>
+                    </div>
                 </div>
-                <div style="margin-bottom:20px;">
-                    <label style="display:block; font-size:12px; font-weight:700; color:var(--text-primary); margin-bottom:6px;">${this.t('lbl_reg_code')}</label>
-                    <input type="text" id="proRegCode" class="full-input" style="font-family:monospace; font-weight:900;" value="${prevCodeVal}" placeholder="HI40-${devCode}-XXXXX-XXXXX / TR48-${devCode}-XXXXX-XXXXX" oninput="this.value = this.value.toUpperCase()">
+
+                <!-- 3단계: 리딤코드 입력 및 활성화 -->
+                <div style="background:var(--bg-soft); border:1.5px solid var(--border-strong); border-radius:12px; padding:14px; margin-bottom:16px;">
+                    <div style="font-size:13px; font-weight:900; color:var(--text-primary); margin-bottom:4px;">
+                        ${this.t('step3_title')}
+                    </div>
+                    <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:8px;">
+                        ${this.t('step3_desc')}
+                    </div>
+                    <input type="text" id="proRegCode" class="full-input" style="font-family:monospace; font-weight:900; font-size:15px; letter-spacing:1.5px; text-align:center; color:#065f46; background:#fff; padding:12px; border:1.5px solid #adb5bd; border-radius:8px; width:100%; box-sizing:border-box; margin-bottom:12px;" value="${prevCodeVal}" placeholder="HEAT-${devCode}-XXXXX-XXXXX" oninput="this.value = this.value.toUpperCase()">
+
+                    <div style="display:flex; gap:10px;">
+                        <button type="button" class="act-btn btn-orange" style="flex:1; background:var(--brand-orange); color:#fff; border:none; padding:13px; border-radius:8px; font-size:15px; font-weight:900; cursor:pointer;" onclick="MainController.verifyRedeemCode()">${this.t('btn_activate_pro')}</button>
+                        <button type="button" class="act-btn" style="background:#000; color:#fff; border:none; width:100px; padding:13px; border-radius:8px; font-size:14px; font-weight:800; cursor:pointer;" onclick="MainController.closeModal()">${this.t('btn_close_x')}</button>
+                    </div>
                 </div>
-                
-                <div style="display:flex; gap:12px;">
-                    <button type="button" class="act-btn btn-orange" style="flex:1; background:var(--brand-orange); color:#fff; border:none;" onclick="MainController.verifyRedeemCode()">${this.t('btn_activate_pro')}</button>
+                <div style="display:none;"><button type="button" class="act-btn btn-orange" style="flex:1; background:var(--brand-orange); color:#fff; border:none;" onclick="MainController.verifyRedeemCode()">${this.t('btn_activate_pro')}</button>
                     <button type="button" class="act-btn" style="background:#000; color:#fff; border:none; width:100px;" onclick="MainController.closeModal()">${this.t('btn_close_x')}</button>
                 </div>
                 <div id="proAuthMessage" style="margin-top:12px; font-size:13px; font-weight:800; text-align:center;"></div>
@@ -3436,6 +4401,178 @@ const MainController = (() => {
         return _getDeviceCode();
     },
 
+    
+    applyByEmail: async function() {
+        const emailInp = document.getElementById('emailApplyInput');
+        const statusEl = document.getElementById('emailApplyStatus');
+        const nameInp = document.getElementById('proRegName');
+        const btn = document.getElementById('btnApplyEmail');
+        const email = (emailInp ? emailInp.value : '').trim();
+        const name = (nameInp && nameInp.value ? nameInp.value : '').trim();
+        const dev = _getDeviceCode();
+
+        if (!name) {
+            if (statusEl) {
+                statusEl.innerHTML = `
+                    <div style="background:#fff5f5; border:1.5px solid #ff8787; border-radius:8px; padding:10px 12px; color:#c92a2a; font-weight:800; font-size:12px;">
+                        ${this.t('err_name_required')}
+                    </div>
+                `;
+            }
+            if (nameInp) nameInp.focus();
+            return;
+        }
+
+        if (!email || !email.includes('@')) {
+            if (statusEl) {
+                statusEl.innerHTML = `
+                    <div style="background:#fff5f5; border:1.5px solid #ff8787; border-radius:8px; padding:10px 12px; color:#c92a2a; font-weight:800; font-size:12px;">
+                        ${this.t('err_email_invalid')}
+                    </div>
+                `;
+            }
+            if (emailInp) emailInp.focus();
+            return;
+        }
+
+        // 1. 클라이언트에서 전용 영구 리딤코드 즉시 선계산 및 자동 채우기 (사용자 대기시간 0초)
+        const instantCode = _generateDeviceCode('HEAT', dev);
+        const codeInp = document.getElementById('proRegCode');
+        if (codeInp) codeInp.value = instantCode;
+
+        // 버튼 상태 변경 (중복 클릭 방지)
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.7';
+            btn.innerHTML = this.t('status_sending');
+        }
+
+        // 2. 실시간 발송 진행 상황 안내 박스 즉시 출력
+        if (statusEl) {
+            statusEl.innerHTML = `
+                <div style="background:#e7f5ff; border:1.5px solid #339af0; border-radius:10px; padding:12px 14px; box-shadow:0 2px 8px rgba(51,154,240,0.15);">
+                    <div style="font-size:13px; font-weight:900; color:#1864ab; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+                        <span style="display:inline-block; font-size:16px;">⏳</span> ${this.t('status_processing_title')}
+                    </div>
+                    <div style="font-size:12px; color:#343a40; line-height:1.6;">
+                        ${this.t('status_code_ready')}<br>
+                        ${this.t('status_sending_mail', { email: email })}<br>
+                        <div style="margin-top:6px; color:#e03131; font-size:11.5px; font-weight:800; background:#fff5f5; padding:4px 8px; border-radius:6px; border:1px solid #ffc9c9;">
+                            ${this.t('step1_spam_notice')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        const apiUrl = (localStorage.getItem('PRO_ADMIN_GAS_URL') || localStorage.getItem(this.LICENSE_API_URL_KEY) || this.DEFAULT_LICENSE_API_URL || '').trim();
+        if (!apiUrl) {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.innerHTML = this.t('step1_btn_get');
+            }
+            if (statusEl) {
+                statusEl.innerHTML = `
+                    <div style="background:#ebfbee; border:1.5px solid #63e6be; border-radius:8px; padding:10px; margin-top:6px; font-size:12px; color:#2b8a3e; line-height:1.5;">
+                        ✅ ${this.t('status_code_ready')}
+                    </div>
+                `;
+            }
+            return;
+        }
+
+        const cleanUrl = apiUrl.split('?')[0].trim();
+        const sep = cleanUrl.includes('?') ? '&' : '?';
+        const reqUrl = `${cleanUrl}${sep}action=emailApply&email=${encodeURIComponent(email)}&dev=${encodeURIComponent(dev)}&name=${encodeURIComponent(name)}&app=HEAT&t=${Date.now()}`;
+
+        let isCompleted = false;
+        const markSuccess = (emailSent) => {
+            if (isCompleted) return;
+            isCompleted = true;
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.innerHTML = this.t('btn_resend');
+            }
+            if (statusEl) {
+                statusEl.innerHTML = `
+                    <div style="background:#ebfbee; border:1.5px solid #38d9a9; border-radius:10px; padding:12px 14px; box-shadow:0 2px 8px rgba(56,217,169,0.15);">
+                        <div style="font-size:13px; font-weight:900; color:#0ca678; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+                            <span>🎉</span> <strong>${this.t('status_sent_title', { email: email })}</strong>
+                        </div>
+                        <div style="font-size:12px; color:#212529; line-height:1.6;">
+                            ${this.t('status_sent_line1', { code: instantCode })}<br>
+                            ${this.t('status_sent_line2')}<br>
+                            <div style="margin-top:8px; background:#fff9db; border:1.5px solid #fcc419; border-radius:6px; padding:6px 10px; font-size:11.5px; color:#d9480f; font-weight:800;">
+                                ${this.t('status_sent_spam')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        };
+
+        const markTimeoutOrError = () => {
+            if (isCompleted) return;
+            isCompleted = true;
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.innerHTML = this.t('btn_resend');
+            }
+            if (statusEl) {
+                statusEl.innerHTML = `
+                    <div style="background:#f8f9fa; border:1.5px solid #ced4da; border-radius:10px; padding:12px 14px; margin-top:6px;">
+                        <div style="font-size:13px; font-weight:900; color:#2b8a3e; margin-bottom:4px;">
+                            ${this.t('status_sent_line1', { code: instantCode })}
+                        </div>
+                        <div style="font-size:12px; color:#495057; line-height:1.6;">
+                            ${this.t('status_sent_line2')}<br>
+                            <span style="display:inline-block; margin-top:4px; font-size:11px; color:#868e96;">
+                                ${this.t('step1_spam_notice')}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }
+        };
+
+        // 6초 타임아웃 타이머 설정
+        const timer = setTimeout(markTimeoutOrError, 6000);
+
+        try {
+            const res = await fetch(reqUrl);
+            const data = await res.json();
+            clearTimeout(timer);
+            if (data && (data.ok || data.success)) {
+                markSuccess(data.emailSent);
+            } else {
+                markTimeoutOrError();
+            }
+        } catch(err) {
+            // JSONP Fallback
+            const cbName = 'email_cb_' + Date.now();
+            const s = document.createElement('script');
+            window[cbName] = (data) => {
+                clearTimeout(timer);
+                if (s.parentNode) s.parentNode.removeChild(s);
+                delete window[cbName];
+                if (data && (data.ok || data.success)) {
+                    markSuccess(data.emailSent);
+                } else {
+                    markTimeoutOrError();
+                }
+            };
+            s.onerror = () => {
+                clearTimeout(timer);
+                markTimeoutOrError();
+            };
+            s.src = reqUrl + '&callback=' + cbName;
+            document.body.appendChild(s);
+        }
+    },
+
     copyMyDeviceCode: function(openKakao = false) {
         const devCode = _getDeviceCode();
         const nameEl = document.getElementById('proRegName');
@@ -3447,6 +4584,24 @@ const MainController = (() => {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(copyTxt).catch(() => {});
         }
+        try {
+            const STORAGE_KEY = 'PRO_ADMIN_APP_LIST_V27';
+            let list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            if (!Array.isArray(list)) list = [];
+            const nowStr = new Date().toLocaleString('ko-KR', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+            if (!list.some(r => r.dev === devCode)) {
+                list.unshift({
+                    dev: devCode,
+                    name: userTxt || '카톡 신청자',
+                    app: 'HEAT',
+                    status: 'PENDING',
+                    code: '',
+                    time: nowStr,
+                    ts: Date.now()
+                });
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+            }
+        } catch(e) {}
         if (openKakao) {
             alert(this.t('alert_kakao_copied', { dev: devCode }));
             window.open('https://pf.kakao.com/_hALxeX', '_blank');
@@ -3464,13 +4619,47 @@ const MainController = (() => {
 
     showMainView: function() { this.closeModal(); },
 
+    switchToFreeModeForTesting: async function() {
+        localStorage.removeItem(this.LICENSE_KEY);
+        _proVerifiedState = false;
+        if (typeof document !== 'undefined' && document.body) {
+            document.body.classList.add('is-free-mode');
+        }
+        const badge = document.getElementById('proBadge');
+        if (badge) {
+            badge.innerText = 'Free';
+            badge.style.backgroundColor = '';
+            badge.style.color = '';
+        }
+        if (typeof HeaderKit !== 'undefined') {
+            HeaderKit.setProStatus(false, 'Free', 'free');
+        }
+        await this.checkProStatus();
+        this.renderLicenseBoxInSettings();
+        if (typeof PresetManager !== 'undefined') PresetManager.updateCounts();
+        const msgEl = document.getElementById('proAuthMessage');
+        if (msgEl) {
+            msgEl.style.color = '#e03131';
+            msgEl.innerText = '🔄 [테스트 모드] PRO 인증이 해제되어 FREE(무료) 모드로 전환되었습니다.';
+        }
+        const codeInput = document.getElementById('proRegCode');
+        if (codeInput) codeInput.value = '';
+        alert('🔄 FREE(무료) 모드로 성공적으로 전환되었습니다.\n프리 버전의 기능 제한 및 블러 처리를 테스트하실 수 있습니다.\n(언제든 정식 리딤 코드를 다시 입력하면 PRO로 복구됩니다.)');
+    },
+
     verifyRedeemCode: async function() {
         const nameInput = document.getElementById('proRegName');
         const codeInput = document.getElementById('proRegCode');
         const msgEl = document.getElementById('proAuthMessage');
         const holderName = (nameInput && nameInput.value ? nameInput.value : "").trim();
-        const rawCode = (codeInput.value || "").trim().toUpperCase();
+        const rawCode = (codeInput ? codeInput.value : "").trim().toUpperCase();
         const devCode = _getDeviceCode();
+
+        // 🧪 [관리자 비공개 테스트] PRO -> FREE 원클릭 전환 비밀 코드 (일반 사용자 비노출)
+        if (rawCode === 'FREEADMINTEST' || rawCode === 'FREE-ADMIN-TEST') {
+            await this.switchToFreeModeForTesting();
+            return;
+        }
 
         if (!holderName) {
             msgEl.style.color = '#e03131';
@@ -3479,7 +4668,7 @@ const MainController = (() => {
             return;
         }
 
-        if (!/^(HI40|TR48)-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(rawCode)) {
+        if (!/^([A-Z0-9]{3,5})-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$/.test(rawCode)) {
             msgEl.style.color = '#e03131';
             msgEl.innerText = this.t('err_reg_code_fmt', { dev: devCode });
             return;
@@ -3491,12 +4680,10 @@ const MainController = (() => {
                 localStorage.setItem(this.LICENSE_KEY, JSON.stringify({
                     name: holderName,
                     code: rawCode,
-                    device: devCode,
-                    isTrial: Boolean(detail.isTrial),
-                    expiresAtMs: detail.expiresAtMs || 0
+                    device: devCode
                 }));
-                msgEl.style.color = detail.isTrial ? '#f59f00' : '#12b886';
-                msgEl.innerText = this.t(detail.isTrial ? 'msg_pro_trial_verified' : 'msg_pro_verified', {
+                msgEl.style.color = '#12b886';
+                msgEl.innerText = this.t('msg_pro_verified', {
                     holder: holderName ? `${holderName} / ` : '',
                     dev: devCode
                 });
@@ -3507,11 +4694,9 @@ const MainController = (() => {
                 if (navigator.onLine !== false) {
                     this.syncRemoteLicenseStatus();
                 }
-            } else if (detail.reason === 'TRIAL_EXPIRED') {
+            } else if (detail.reason === 'APP_MISMATCH') {
                 msgEl.style.color = '#e03131';
-                msgEl.innerText = this.t('err_pro_trial_expired');
-                await this.checkProStatus();
-                this.renderLicenseBoxInSettings();
+                msgEl.innerText = this.t('err_app_mismatch', { prefix: detail.prefix || 'UNKNOWN' });
             } else if (detail.reason === 'DEVICE_MISMATCH') {
                 msgEl.style.color = '#e03131';
                 msgEl.innerText = this.t('err_pro_dev_mismatch', {
@@ -3541,33 +4726,27 @@ const MainController = (() => {
                 const detail = await _verifyCodeDetail(saved.code);
                 if (detail.ok) {
                     _proVerifiedState = true;
-                    this._proTrialInfo = detail.isTrial ? detail : null;
+                    if (typeof document !== 'undefined' && document.body) {
+                        document.body.classList.remove('is-free-mode');
+                    }
                     if (badge) {
-                        if (detail.isTrial) {
-                            badge.innerText = this.t('badge_pro_trial', { rem: detail.remainingHours || 48 });
-                            badge.style.backgroundColor = '#f59f00';
-                            badge.style.color = '#ffffff';
-                        } else {
-                            badge.innerText = 'Pro';
-                            badge.style.backgroundColor = '#12b886';
-                            badge.style.color = '#ffffff';
-                        }
+                        badge.innerText = 'Pro';
+                        badge.style.backgroundColor = '#12b886';
+                        badge.style.color = '#ffffff';
                     }
                     if (typeof HeaderKit !== 'undefined') {
-                        HeaderKit.setProStatus(true, detail.isTrial ? ('Pro ' + (detail.remainingHours || 48) + 'h') : 'Pro', detail.isTrial ? 'trial' : 'pro');
+                        HeaderKit.setProStatus(true, 'Pro', 'pro');
                     }
                     if (typeof PresetManager !== 'undefined') PresetManager.updateCounts();
+                    this.updateProcessSelectUI();
                     return;
-                } else if (detail.reason === 'TRIAL_EXPIRED') {
-                    // 48시간 만료 시 저장된 임시 라이선스 자동 해제
-                    localStorage.removeItem(this.LICENSE_KEY);
-                    this._proTrialInfo = null;
-                    this.showSyncToast(this.t('err_pro_trial_expired'), 'offline-mode', 7000);
                 }
             }
         } catch (e) {}
         _proVerifiedState = false;
-        this._proTrialInfo = null;
+        if (typeof document !== 'undefined' && document.body) {
+            document.body.classList.add('is-free-mode');
+        }
         if (badge) {
             badge.innerText = 'Free';
             badge.style.backgroundColor = '';
@@ -3577,12 +4756,13 @@ const MainController = (() => {
             HeaderKit.setProStatus(false, 'Free', 'free');
         }
         if (typeof PresetManager !== 'undefined') PresetManager.updateCounts();
+        this.updateProcessSelectUI();
     },
 
     syncRemoteLicenseStatus: async function() {
         try {
             if (navigator.onLine === false) return;
-            const apiUrl = (localStorage.getItem(this.LICENSE_API_URL_KEY) || this.DEFAULT_LICENSE_API_URL || '').trim();
+            const apiUrl = (localStorage.getItem('PRO_ADMIN_GAS_URL') || localStorage.getItem(this.LICENSE_API_URL_KEY) || this.DEFAULT_LICENSE_API_URL || '').trim();
             if (!apiUrl) return;
             const saved = JSON.parse(localStorage.getItem(this.LICENSE_KEY) || 'null');
             if (!saved || !saved.code) return;
@@ -3595,8 +4775,7 @@ const MainController = (() => {
 
             if (data.status === 'APPROVED' && data.permanentCode) {
                 const permDetail = await _verifyCodeDetail(data.permanentCode);
-                if (permDetail.ok && !permDetail.isTrial) {
-                    // 관리자가 재승인한 경우 이전 해제(REVOKED) 목록에서 제거
+                if (permDetail.ok) {
                     try {
                         const revList = JSON.parse(localStorage.getItem(_REVOKED_KEY) || '[]');
                         const filtered = Array.isArray(revList)
@@ -3604,20 +4783,14 @@ const MainController = (() => {
                             : [];
                         localStorage.setItem(_REVOKED_KEY, JSON.stringify(filtered));
                     } catch (e) {}
-                    const wasTrial = Boolean(saved.isTrial);
                     localStorage.setItem(this.LICENSE_KEY, JSON.stringify({
                         name: saved.name || devCode,
                         code: data.permanentCode,
                         initialCode: saved.initialCode || saved.code,
-                        device: devCode,
-                        isTrial: false,
-                        expiresAtMs: 0
+                        device: devCode
                     }));
                     await this.checkProStatus();
                     this.renderLicenseBoxInSettings();
-                    if (wasTrial) {
-                        this.showSyncToast(this.t('msg_pro_auto_upgraded'), 'online-synced', 6000);
-                    }
                 }
             } else if (data.status === 'REVOKED' || data.status === 'EXPIRED') {
                 const revList = JSON.parse(localStorage.getItem(_REVOKED_KEY) || '[]');
@@ -3629,7 +4802,6 @@ const MainController = (() => {
                 localStorage.removeItem(this.LICENSE_KEY);
                 await this.checkProStatus();
                 this.renderLicenseBoxInSettings();
-                this.showSyncToast(this.t('err_pro_trial_expired'), 'offline-mode', 7000);
             }
         } catch (e) {}
     },
@@ -3642,24 +4814,48 @@ const MainController = (() => {
         if (_proVerifiedState && saved && saved.code) {
             statusEl.style.display = 'block';
             statusEl.style.fontWeight = '800';
-            if (this._proTrialInfo && this._proTrialInfo.isTrial) {
-                statusEl.style.color = '#f59f00';
-                statusEl.innerText = this.t('status_pro_trial_active', {
-                    rem: this._proTrialInfo.remainingHours || 48,
-                    dev: devCode,
-                    holder: saved.name ? `(${saved.name})` : ''
-                });
-            } else {
-                statusEl.style.color = '#12b886';
-                statusEl.innerText = this.t('status_pro_active', {
-                    dev: devCode,
-                    holder: saved.name ? `(${saved.name})` : ''
-                });
-            }
+            statusEl.style.color = '#12b886';
+            statusEl.innerHTML = `
+                <div>${this.t('status_pro_active', { dev: devCode, holder: saved.name ? `(${saved.name})` : '' })}</div>
+            `;
         } else {
             statusEl.style.display = 'block';
             statusEl.style.color = 'var(--text-muted)';
             statusEl.innerText = this.t('status_free_mode', { dev: devCode });
+        }
+    },
+
+    updateProcessSelectUI: function() {
+        const sel = document.getElementById('selProcess');
+        if (!sel) return;
+        const curVal = sel.value || 'FCAW';
+        const isPro = this.isPro;
+        const lockPrefix = isPro ? '' : '🔒 ';
+
+        sel.innerHTML = `
+            <optgroup label="${this.t('proc_std_group')}">
+                <option value="FCAW">${this.t('proc_fcaw')}</option>
+                <option value="GMAW">${this.t('proc_gmaw')}</option>
+                <option value="SMAW">${this.t('proc_smaw')}</option>
+                <option value="GTAW">${this.t('proc_gtaw')}</option>
+                <option value="SAW">${this.t('proc_saw')}</option>
+            </optgroup>
+            <optgroup label="${lockPrefix}${this.t('proc_arc_group')}">
+                <option value="PAW">${lockPrefix}${this.t('proc_paw')}</option>
+                <option value="EGW">${lockPrefix}${this.t('proc_egw')}</option>
+                <option value="ESW">${lockPrefix}${this.t('proc_esw')}</option>
+            </optgroup>
+            <optgroup label="${lockPrefix}${this.t('proc_beam_group')}">
+                <option value="LBW">${lockPrefix}${this.t('proc_lbw')}</option>
+                <option value="HLAW">${lockPrefix}${this.t('proc_hlaw')}</option>
+                <option value="EBW">${lockPrefix}${this.t('proc_ebw')}</option>
+            </optgroup>
+        `;
+
+        if (Array.from(sel.options).some(o => o.value === curVal)) {
+            sel.value = curVal;
+        } else {
+            sel.value = 'FCAW';
         }
     }
     };
