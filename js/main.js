@@ -4367,7 +4367,7 @@ const MainController = (() => {
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-soft); padding:8px 12px; border-radius:8px; font-size:11.5px; border:1px solid var(--border-light);">
                         <span style="color:var(--text-muted);">${this.t('step2_inquiry')}</span>
-                        <a href="https://pf.kakao.com/_hALxeX" target="_blank" rel="noopener" style="color:var(--brand-orange); font-weight:800; text-decoration:underline;">${this.t('step2_kakao_chat')}</a>
+                        <a href="https://pf.kakao.com/_hALxeX/chat" target="_blank" rel="noopener" style="color:var(--brand-orange); font-weight:800; text-decoration:underline;">${this.t('step2_kakao_chat')}</a>
                     </div>
                 </div>
 
