@@ -212,7 +212,7 @@ const PresetManager = {
                 <span>${prefix}</span>
                 <div class="mode-pill-group">
                     <button type="button" class="mode-pill ${activeTab === 'view' ? 'active' : ''}" onclick="PresetManager.openViewer('${type}')">${this.t('btn_view_list')}</button>
-                    <button type="button" class="mode-pill ${activeTab === 'edit' ? 'active' : ''}" onclick="PresetManager.openEditor('${type}')">${this.t('btn_edit')}</button>
+                    <button type="button" class="mode-pill pro-feature-btn ${activeTab === 'edit' ? 'active' : ''}" onclick="PresetManager.openEditor('${type}')">${this.t('btn_edit')}</button>
                 </div>
                 <span style="font-size:12px; font-weight:700; color:var(--text-muted);">(<span id="editCountLbl">${count}</span>/${maxCount})</span>
             </div>
@@ -566,7 +566,7 @@ const PresetManager = {
                 content += `${item.id}\t${item.name}\t${item.dept}\n`;
             });
             if (!MainController.isPro || DataStore.getWelderPresets().length === 0) {
-                DataStore.setWelderPresets(sampleWelders);
+                DataStore.setWelderPresets(sampleWelders, true);
                 if (typeof MainController !== 'undefined') MainController._welderPoolCache = null;
                 this.updateCounts();
             }
