@@ -116,6 +116,62 @@ const HeaderKit = (() => {
                 }
             };
         }
+
+        // 6. 앱 아이콘 클릭 시 페이지 상단 이동 + 로고 크게 보기
+        const logoBox = document.querySelector('.app-logo-box');
+        if (logoBox) {
+            logoBox.style.cursor = 'pointer';
+            logoBox.onclick = (e) => {
+                e.stopPropagation();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                const img = logoBox.querySelector('img');
+                if (img && img.src) {
+                    showLogoPreview(img.src, img.alt || 'App Logo');
+                }
+            };
+        }
+    };
+
+    let _logoPreviewTimer = null;
+
+    const showLogoPreview = (src, alt) => {
+        let overlay = document.getElementById('hkLogoPreviewOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'hkLogoPreviewOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.62);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px);';
+            overlay.innerHTML = `
+                <div style="background:#ffffff;border-radius:18px;padding:18px;box-shadow:0 18px 48px rgba(0,0,0,0.32);max-width:340px;width:90%;text-align:center;">
+                    <img id="hkLogoPreviewImg" src="" alt="" style="width:240px;height:240px;object-fit:contain;border-radius:14px;display:block;margin:0 auto;" />
+                    <div style="margin-top:12px;">
+                        <button type="button" id="hkLogoPreviewClose" style="padding:6px 18px;border:none;border-radius:8px;background:#ff7f00;color:#fff;font-weight:800;font-size:12.5px;cursor:pointer;">닫기 / Close</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            overlay.addEventListener('click', (ev) => {
+                if (ev.target === overlay || ev.target.id === 'hkLogoPreviewClose') {
+                    if (_logoPreviewTimer) clearTimeout(_logoPreviewTimer);
+                    overlay.style.display = 'none';
+                }
+            });
+            document.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Escape' && overlay.style.display !== 'none') {
+                    if (_logoPreviewTimer) clearTimeout(_logoPreviewTimer);
+                    overlay.style.display = 'none';
+                }
+            });
+        }
+        const imgEl = document.getElementById('hkLogoPreviewImg');
+        if (imgEl) {
+            imgEl.src = src;
+            imgEl.alt = alt;
+        }
+        overlay.style.display = 'flex';
+        if (_logoPreviewTimer) clearTimeout(_logoPreviewTimer);
+        _logoPreviewTimer = setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 2000);
     };
 
     const setVersion = (ver) => {
