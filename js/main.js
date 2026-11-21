@@ -1981,8 +1981,12 @@ const MainController = (() => {
         }).join('');
 
         const brand = (window.CompanyBrand && CompanyBrand.get) ? CompanyBrand.get() : { companyName: '', companyLogo: '' };
+        const logoMatch = (brand.companyLogo || '').match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+        const logoImgTag = logoMatch
+            ? `<img src="company_logo.png" height="32" style="vertical-align:middle; margin-right:10px;">`
+            : (brand.companyLogo ? `<img src="${brand.companyLogo}" height="32" style="vertical-align:middle; margin-right:10px;">` : '');
         const brandRow = (brand.companyName || brand.companyLogo)
-            ? `<tr><td colspan="17" style="padding:8px 12px; border:1px solid #dee2e6; background:#ffffff; text-align:left; font-size:13pt; font-weight:bold; color:#0f172a;">${brand.companyLogo ? `<img src="${brand.companyLogo}" height="32" style="vertical-align:middle; margin-right:10px;">` : ''}${this.escapeHtml(brand.companyName || '')}</td></tr>`
+            ? `<tr><td colspan="17" style="padding:8px 12px; border:1px solid #dee2e6; background:#ffffff; text-align:left; font-size:13pt; font-weight:bold; color:#0f172a;">${logoImgTag}${this.escapeHtml(brand.companyName || '')}</td></tr>`
             : '';
 
         const excelHtml = `
@@ -2048,7 +2052,42 @@ const MainController = (() => {
         `;
 
         try {
-            const blob = new Blob(['\uFEFF' + excelHtml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+            let blobContent = '\uFEFF' + excelHtml;
+            if (logoMatch) {
+                const boundary = '----=_NextPart_ISKOREA_LOGO';
+                const bytesToB64 = (bytes) => {
+                    let bin = '';
+                    for (let i = 0; i < bytes.length; i += 0x8000) {
+                        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+                    }
+                    return btoa(bin);
+                };
+                const wrap76 = (s) => (s.match(/.{1,76}/g) || []).join('\r\n');
+                const htmlB64 = wrap76(bytesToB64(new TextEncoder().encode(excelHtml)));
+                const imgB64 = wrap76(logoMatch[2].replace(/\s+/g, ''));
+                blobContent = [
+                    'MIME-Version: 1.0',
+                    `Content-Type: multipart/related; boundary="${boundary}"`,
+                    '',
+                    `--${boundary}`,
+                    'Content-Location: file:///C:/report.html',
+                    'Content-Transfer-Encoding: base64',
+                    'Content-Type: text/html; charset="utf-8"',
+                    '',
+                    htmlB64,
+                    '',
+                    `--${boundary}`,
+                    'Content-Location: file:///C:/company_logo.png',
+                    'Content-Transfer-Encoding: base64',
+                    `Content-Type: ${logoMatch[1]}`,
+                    '',
+                    imgB64,
+                    '',
+                    `--${boundary}--`,
+                    ''
+                ].join('\r\n');
+            }
+            const blob = new Blob([blobContent], { type: 'application/vnd.ms-excel;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.style.display = 'none';
@@ -4916,24 +4955,55 @@ const MainController = (() => {
         const curVal = sel.value || 'FCAW';
         const isPro = this.isPro;
         const lockPrefix = isPro ? '' : '🔒 ';
+        const isMobile = (typeof window !== 'undefined') && (window.innerWidth <= 640 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ''));
+        this._lastProcessMobileState = isMobile;
+
+        if (!this._processResizeBound && typeof window !== 'undefined') {
+            this._processResizeBound = true;
+            let resizeTimer = null;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    const nextMobile = window.innerWidth <= 640 || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+                    if (nextMobile !== this._lastProcessMobileState) {
+                        this.updateProcessSelectUI();
+                    }
+                }, 120);
+            });
+        }
+
+        const shortLabels = {
+            FCAW: 'FCAW-136',
+            GMAW: 'GMAW-135',
+            SMAW: 'SMAW-111',
+            GTAW: 'GTAW-141',
+            SAW: 'SAW-121',
+            PAW: 'PAW-15',
+            EGW: 'EGW-73',
+            ESW: 'ESW-72',
+            LBW: 'LBW-52',
+            HLAW: 'HLAW-521',
+            EBW: 'EBW-51'
+        };
+        const getLabel = (code, i18nKey) => isMobile ? (shortLabels[code] || code) : this.t(i18nKey);
 
         sel.innerHTML = `
             <optgroup label="${this.t('proc_std_group')}">
-                <option value="FCAW">${this.t('proc_fcaw')}</option>
-                <option value="GMAW">${this.t('proc_gmaw')}</option>
-                <option value="SMAW">${this.t('proc_smaw')}</option>
-                <option value="GTAW">${this.t('proc_gtaw')}</option>
-                <option value="SAW">${this.t('proc_saw')}</option>
+                <option value="FCAW">${getLabel('FCAW', 'proc_fcaw')}</option>
+                <option value="GMAW">${getLabel('GMAW', 'proc_gmaw')}</option>
+                <option value="SMAW">${getLabel('SMAW', 'proc_smaw')}</option>
+                <option value="GTAW">${getLabel('GTAW', 'proc_gtaw')}</option>
+                <option value="SAW">${getLabel('SAW', 'proc_saw')}</option>
             </optgroup>
             <optgroup label="${lockPrefix}${this.t('proc_arc_group')}">
-                <option value="PAW">${lockPrefix}${this.t('proc_paw')}</option>
-                <option value="EGW">${lockPrefix}${this.t('proc_egw')}</option>
-                <option value="ESW">${lockPrefix}${this.t('proc_esw')}</option>
+                <option value="PAW">${lockPrefix}${getLabel('PAW', 'proc_paw')}</option>
+                <option value="EGW">${lockPrefix}${getLabel('EGW', 'proc_egw')}</option>
+                <option value="ESW">${lockPrefix}${getLabel('ESW', 'proc_esw')}</option>
             </optgroup>
             <optgroup label="${lockPrefix}${this.t('proc_beam_group')}">
-                <option value="LBW">${lockPrefix}${this.t('proc_lbw')}</option>
-                <option value="HLAW">${lockPrefix}${this.t('proc_hlaw')}</option>
-                <option value="EBW">${lockPrefix}${this.t('proc_ebw')}</option>
+                <option value="LBW">${lockPrefix}${getLabel('LBW', 'proc_lbw')}</option>
+                <option value="HLAW">${lockPrefix}${getLabel('HLAW', 'proc_hlaw')}</option>
+                <option value="EBW">${lockPrefix}${getLabel('EBW', 'proc_ebw')}</option>
             </optgroup>
         `;
 
