@@ -1789,8 +1789,10 @@ const MainController = (() => {
             ? 'background:var(--brand-orange); color:#fff; border:1.5px solid var(--brand-orange); font-weight:900;'
             : 'background:var(--bg-card); color:var(--text-primary); border:1.5px solid var(--border-strong); font-weight:700;';
 
+        const brandPreview = (window.CompanyBrand && CompanyBrand.headerHtml) ? CompanyBrand.headerHtml() : '';
         body.innerHTML = `
             <div class="report-modal-wrap">
+                ${brandPreview}
                 <div class="report-meta-box">
                     <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border-light);">
                         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -1864,6 +1866,9 @@ const MainController = (() => {
                 </div>
 
                 <div class="report-action-btns">
+                    <button type="button" class="report-act-btn" style="background:#334155;color:#fff;" onclick="window.CompanyBrand && CompanyBrand.openModal('${lang}', () => MainController.renderDailyReportModal(document.getElementById('subPageBody'), null, (document.getElementById('reportProjectName')||{}).value, (document.getElementById('reportInspectorName')||{}).value))">
+                        ${window.CompanyBrand ? CompanyBrand.btnLabel(lang) : '🏢'}
+                    </button>
                     <button type="button" class="report-act-btn btn-rep-excel" onclick="MainController.exportDailyReportExcel()">
                         ${this.t('btn_export_excel')}
                     </button>
@@ -1937,6 +1942,11 @@ const MainController = (() => {
             `;
         }).join('');
 
+        const brand = (window.CompanyBrand && CompanyBrand.get) ? CompanyBrand.get() : { companyName: '', companyLogo: '' };
+        const brandRow = (brand.companyName || brand.companyLogo)
+            ? `<tr><td colspan="17" style="padding:8px 12px; border:1px solid #dee2e6; background:#ffffff; text-align:left; font-size:13pt; font-weight:bold; color:#0f172a;">${brand.companyLogo ? `<img src="${brand.companyLogo}" height="32" style="vertical-align:middle; margin-right:10px;">` : ''}${this.escapeHtml(brand.companyName || '')}</td></tr>`
+            : '';
+
         const excelHtml = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head>
@@ -1960,6 +1970,7 @@ const MainController = (() => {
             </head>
             <body>
                 <table style="width:100%; border-collapse:collapse;">
+                    ${brandRow}
                     <tr>
                         <td colspan="17" style="font-size:18pt; font-weight:bold; text-align:center; padding:15px; background:#fff3e6; color:#d9480f; border:1px solid #ffa94d;">
                             ${titleText}
@@ -2099,6 +2110,7 @@ const MainController = (() => {
                 </style>
             </head>
             <body>
+                ${(window.CompanyBrand && CompanyBrand.headerHtml) ? CompanyBrand.headerHtml() : ''}
                 <div class="header-title">${titleText}</div>
                 <div class="meta-bar">
                     <span>📅 <strong>${i18n.dateLbl}</strong> ${today}</span>
@@ -3611,7 +3623,8 @@ const MainController = (() => {
         this.processScannedText(rawText);
     },
 
-    processScannedText: function(rawText) {
+    processScannedText: function(rawText, opts = {}) {
+        const isBarcode = Boolean(opts && opts.isBarcode);
         const decoded = this.decodeQrText(rawText);
         const raw = String(decoded || "").trim();
         if (!raw) return;
@@ -3626,17 +3639,43 @@ const MainController = (() => {
             const idInput = document.getElementById('inpWelderId');
             const nameInput = document.getElementById('inpWelderName');
             const deptInput = document.getElementById('inpWelderDept');
-            if (idInput) idInput.value = idVal || '';
-            if (nameInput) nameInput.value = nameVal || '';
-            if (deptInput) deptInput.value = deptVal || '';
+            if (idInput) {
+                idInput.value = idVal || '';
+                idInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (nameInput) {
+                nameInput.value = nameVal || '';
+                nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+            if (deptInput) {
+                deptInput.value = deptVal || '';
+                deptInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
             this.syncProcessSelectFromDept(deptVal);
             if (statusEl && statusHtml) statusEl.innerHTML = statusHtml;
+            if (typeof this.showToast === 'function') {
+                this.showToast(`✅ 입력 완료: ${idVal || nameVal || ''}`);
+            }
             setTimeout(() => {
                 this.closeScanModal();
                 if (typeof Calculator !== 'undefined') Calculator.calculate();
-            }, 350);
+            }, isBarcode ? 120 : 350);
         };
         const esc = v => this.escapeHtmlAttr(v);
+
+        // 0. JSON 형태 QR 코드 (예: {"id":"W-101","name":"홍길동","dept":"FCAW"})
+        if (raw.startsWith('{') && raw.endsWith('}')) {
+            try {
+                const obj = JSON.parse(raw);
+                const jId = this.normalizeWelderId(obj.id || obj.welder_no || obj.welderId || '');
+                const jName = String(obj.name || obj.welderName || '').trim();
+                const jDept = String(obj.dept || obj.process || obj.wps || '').trim();
+                if (jId || jName || jDept) {
+                    applyWelderToForm(jId, jName, jDept, `<span style="color:#16a34a;">✅ QR 정보 자동 입력: <b>${esc(jId || '-')} ${jName ? '(' + esc(jName) + ')' : ''}</b></span>`);
+                    return;
+                }
+            } catch (e) {}
+        }
 
         // 1. 파이프(|) 구분 QR 코드 (예: YU-WQT-203|홍보|121(SAW) Butt)
         if (raw.includes('|')) {
@@ -3689,7 +3728,7 @@ const MainController = (() => {
         }
 
         let topCands = [];
-        if (!found) {
+        if (!found && !isBarcode) {
             topCands = this.computeWelderCands(raw, pool);
             if (topCands.length === 1 && topCands[0].total >= 70) {
                 found = topCands[0].w;
@@ -3744,13 +3783,21 @@ const MainController = (() => {
 
         // 4. 마스터 풀에 없는 용접사 자유 추출 (불필요한 자격증 테이블 노이즈 제외된 값만 반영)
 
-        if (freeNo || freeName) {
-            const fallbackNo = freeNo || (raw.length <= 16 && /^[A-Za-z0-9_-]+$/.test(raw) ? raw : "");
+        if (freeNo || freeName || freeDept) {
+            const fallbackNo = freeNo || (raw.length <= 24 && /^[A-Za-z0-9_.\-/]+$/.test(raw) ? raw : "");
             applyWelderToForm(
                 fallbackNo,
                 freeName,
                 freeDept,
-                `<span style="color:#d97706;">ℹ️ 스티커에서 추출한 정보 자동 입력: <b>${fallbackNo ? '[' + esc(fallbackNo) + '] ' : ''}${esc(freeName || '')} ${freeDept ? '(' + esc(freeDept) + ')' : ''}</b></span>`
+                `<span style="color:#d97706;">ℹ️ 추출 정보 자동 입력: <b>${fallbackNo ? '[' + esc(fallbackNo) + '] ' : ''}${esc(freeName || '')} ${freeDept ? '(' + esc(freeDept) + ')' : ''}</b></span>`
+            );
+        } else if (isBarcode) {
+            const isKoreanOrSpaces = /[가-힣\s]/.test(raw) && !/^[A-Za-z0-9_.\-/]+$/.test(raw);
+            applyWelderToForm(
+                isKoreanOrSpaces ? '' : raw,
+                isKoreanOrSpaces ? raw : '',
+                '',
+                `<span style="color:#16a34a;">✅ QR/바코드 정보 자동 입력: <b>${esc(raw)}</b></span>`
             );
         } else {
             if (statusEl) {
@@ -3973,7 +4020,7 @@ const MainController = (() => {
                     const cleanCode = this.decodeQrText(code);
                     const rawBox = document.getElementById('scanRawText');
                     if (rawBox) rawBox.value = cleanCode;
-                    this.processScannedText(cleanCode);
+                    this.processScannedText(cleanCode, { isBarcode: true });
                     return;
                 }
                 // 2차: QR/바코드가 없으면 즉시 HI OCR v4 엔진으로 스티커 문자 판독
@@ -4037,7 +4084,7 @@ const MainController = (() => {
                     const cleanCode = this.decodeQrText(code);
                     const rawBox = document.getElementById('scanRawText');
                     if (rawBox) rawBox.value = cleanCode;
-                    this.processScannedText(cleanCode);
+                    this.processScannedText(cleanCode, { isBarcode: true });
                 } else {
                     if (statusEl) {
                         statusEl.innerHTML = `<span style="color:#dc2626;">❌ 스티커에서 글자를 읽지 못했습니다. 글자가 흔들리지 않게 가까이에서 다시 촬영해 주세요.</span>`;
@@ -4117,7 +4164,7 @@ const MainController = (() => {
                         const rawBox = document.getElementById('scanRawText');
                         if (rawBox) rawBox.value = cleanCode;
                         this.stopLiveCamera();
-                        this.processScannedText(cleanCode);
+                        this.processScannedText(cleanCode, { isBarcode: true });
                     }
                 } catch (e) {} finally {
                     busy = false;
@@ -4193,7 +4240,7 @@ const MainController = (() => {
             const rawBox = document.getElementById('scanRawText');
             if (rawBox) rawBox.value = cleanCode;
             this.stopLiveCamera();
-            this.processScannedText(cleanCode);
+            this.processScannedText(cleanCode, { isBarcode: true });
             return;
         }
         const pool = this.getCombinedWelderPool();

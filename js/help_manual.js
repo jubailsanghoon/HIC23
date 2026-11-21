@@ -64,7 +64,12 @@ const HelpManual = {
             legal_title: "법적 고지 (Legal Notice):",
             legal_1: "1. 본 프로그램의 계산 로직은 AWS D1.1 / ASME Sec. IX 및 ISO 1011-1 / ISO 15614-1 공식을 기반으로 설계되었으며 현장 참고용입니다. 실제 적용 시 반드시 승인된 WPS 및 전문가의 검토를 거쳐야 하며, 계산 결과의 단순 적용으로 발생한 결과에 대해 개발자는 법적 책임을 지지 않습니다.",
             legal_2: "2. 본 프로그램의 Free 버전은 비상업적인 용도에 한해 무료로 제공되며, PRO 기능은 정식 리딤 코드 인증을 통해 영구 활성화됩니다.",
-            legal_3: "3. 본 프로그램을 무단으로 수정, 복제, 역설계(디버깅)하거나 상업적으로 재배포하는 행위를 금지합니다."
+            legal_3: "3. 본 프로그램을 무단으로 수정, 복제, 역설계(디버깅)하거나 상업적으로 재배포하는 행위를 금지합니다.",
+            title_faq: "FAQ · 자주 묻는 질문",
+            faq_html: `<p style="margin-bottom:6px;"><b>Q. AWS/ASME와 ISO 기준의 입열량 계산 공식은 어떻게 다른가요?</b><br>AWS/ASME는 kJ/in 단위(60 계수 적용, 선택 시 mm 환산), ISO(EN 1011-1)는 공정별 열효율 계수(k)를 반영한 kJ/mm 단위로 계산합니다.</p>
+<p style="margin-bottom:6px;"><b>Q. WPS·용접사 프리셋 파일(.txt / PDF)은 어떻게 등록하나요?</b><br>Free 버전에서는 .txt 샘플 형식에 맞춰 각 10개까지, PRO 버전에서는 최대 300개 저장 및 PDF 자동 추출·편집을 지원합니다.</p>
+<p style="margin-bottom:6px;"><b>Q. 용접사 헬멧 QR/바코드 스캔에 별도 스캐너가 필요한가요?</b><br>아니요. 스마트폰 카메라로 바로 스캔되며, PRO 버전에서 라벨 인쇄 후 헬멧에 부착하면 현장에서 즉시 인식됩니다.</p>
+<p style="margin:0;"><b>Q. 저장된 기록(CSV)과 일일 보고서(Excel·PDF)는 어떻게 내보내나요?</b><br>하단 기록 탭에서 CSV 파일을 무료로 내보낼 수 있으며, PRO 버전에서는 일일 보고서(.xlsx / .pdf)를 자동 생성합니다.</p>`
         },
         en: {
             modal_title: "📘 User Manual",
@@ -123,7 +128,12 @@ const HelpManual = {
             legal_title: "Legal Notice:",
             legal_1: "1. Calculation formulas are designed based on AWS D1.1 / ASME Sec. IX and ISO 1011-1 / ISO 15614-1 standards for field reference. All actual welding must comply with approved WPS and engineering review. The developer assumes no legal liability for direct applications.",
             legal_2: "2. The Free version is strictly for non-commercial use. PRO features are unlocked permanently via valid Redeem Code registration.",
-            legal_3: "3. Unauthorized modification, reverse engineering, debugging, or commercial redistribution of this application is prohibited."
+            legal_3: "3. Unauthorized modification, reverse engineering, debugging, or commercial redistribution of this application is prohibited.",
+            title_faq: "FAQ · Frequently Asked Questions",
+            faq_html: `<p style="margin-bottom:6px;"><b>Q. How do AWS/ASME and ISO heat input formulas differ?</b><br>AWS/ASME calculates in kJ/in (factor 60, optional mm conversion), while ISO (EN 1011-1) calculates in kJ/mm with process thermal efficiency factor (k).</p>
+<p style="margin-bottom:6px;"><b>Q. How do I register WPS &amp; Welder presets (.txt / PDF)?</b><br>Free allows up to 10 presets each via .txt; PRO unlocks up to 300 presets plus automatic PDF table extraction and editing.</p>
+<p style="margin-bottom:6px;"><b>Q. Do I need a dedicated scanner for helmet QR/barcodes?</b><br>No. Any smartphone camera works, and PRO lets you batch-print labels to attach to helmets.</p>
+<p style="margin:0;"><b>Q. How do I export logs (CSV) and daily reports (Excel/PDF)?</b><br>Export PASS/FAIL CSV logs for free in the history tab; PRO generates formatted daily reports (.xlsx / .pdf).</p>`
         },
         es: {
             modal_title: "📘 Manual de Usuario",
@@ -182,7 +192,12 @@ const HelpManual = {
             legal_title: "Aviso Legal:",
             legal_1: "1. Los cálculos se basan en AWS D1.1 / ASME Sec. IX e ISO 1011-1 / ISO 15614-1 solo con fines de referencia en campo. La aplicación real debe ser validada por un WPS aprobado.",
             legal_2: "2. La versión Free es para uso no comercial. Las funciones PRO se desbloquean permanentemente mediante código de canje.",
-            legal_3: "3. Queda prohibida la modificación, ingeniería inversa o redistribución comercial no autorizada."
+            legal_3: "3. Queda prohibida la modificación, ingeniería inversa o redistribución comercial no autorizada.",
+            title_faq: "FAQ · Preguntas Frecuentes",
+            faq_html: `<p style="margin-bottom:6px;"><b>P. ¿En qué se diferencian las fórmulas AWS/ASME e ISO?</b><br>AWS/ASME calcula en kJ/in (factor 60, conversión opcional a mm), mientras que ISO (EN 1011-1) calcula en kJ/mm con factor de eficiencia térmica (k).</p>
+<p style="margin-bottom:6px;"><b>P. ¿Cómo registro preajustes de WPS y soldadores (.txt / PDF)?</b><br>Free permite hasta 10 en .txt; PRO desbloquea hasta 300 y extracción automática de tablas PDF.</p>
+<p style="margin-bottom:6px;"><b>P. ¿Se necesita un escáner especial para QR/barras del casco?</b><br>No. Funciona directamente con la cámara del móvil y PRO permite imprimir etiquetas en lote.</p>
+<p style="margin:0;"><b>P. ¿Cómo exporto registros (CSV) y reportes diarios (Excel/PDF)?</b><br>Exporte CSV gratis en el historial; PRO genera reportes diarios (.xlsx / .pdf).</p>`
         },
         zh: {
             modal_title: "📘 使用手册",
@@ -241,7 +256,12 @@ const HelpManual = {
             legal_title: "法律声明 (Legal Notice):",
             legal_1: "1. 本程序计算公式依据 AWS D1.1 / ASME Sec. IX 与 ISO 1011-1 / ISO 15614-1 标准设计，仅作现场辅助参考。实际施工前必须经批准的 WPS 及专业焊接工程师确认，开发者不承担直接套用造成的连带法律责任。",
             legal_2: "2. Free 免费版仅供非商业用途，输入官方兑换码即可永久解锁 PRO 全部专业功能。",
-            legal_3: "3. 严禁未经授权修改、逆向工程、反编译或进行商业性二次分发。"
+            legal_3: "3. 严禁未经授权修改、逆向工程、反编译或进行商业性二次分发。",
+            title_faq: "FAQ · 常见问题解答",
+            faq_html: `<p style="margin-bottom:6px;"><b>Q. AWS/ASME 与 ISO 的热输入计算公式有何区别？</b><br>AWS/ASME 采用 kJ/in（系数 60，支持换算为 mm），ISO（EN 1011-1）则按工艺热效率系数(k)计算 kJ/mm。</p>
+<p style="margin-bottom:6px;"><b>Q. 如何导入 WPS 和焊工预设（.txt / PDF）？</b><br>免费版支持最多 10 条 .txt 预设；PRO 版支持最多 300 条及 PDF 表格自动提取与编辑。</p>
+<p style="margin-bottom:6px;"><b>Q. 扫描焊工头盔二维码/条形码需要专用扫码枪吗？</b><br>不需要，使用手机摄像头即可识别，PRO 版可批量打印头盔标签。</p>
+<p style="margin:0;"><b>Q. 如何导出记录（CSV）和日报（Excel/PDF）？</b><br>在底部记录页可免费导出 CSV；PRO 版可自动生成每日检验报告（.xlsx / .pdf）。</p>`
         },
         ja: {
             modal_title: "📘 使用マニュアル",
@@ -300,7 +320,12 @@ const HelpManual = {
             legal_title: "法的告知 (Legal Notice):",
             legal_1: "1. 本プログラムの計算ロジックは AWS D1.1 / ASME Sec. IX および ISO 1011-1 / ISO 15614-1 の公式に基づいて設計されており、参考用です。実際の施工にあたっては承認されたWPSおよび専門技術者の確認を必ず経てください。",
             legal_2: "2. Free版は非営利目的に限り無料で使用でき、リディームコード認証によりPRO機能が永久に有効化されます。",
-            legal_3: "3. 本プログラムの無断修正、変更、デバッグ、逆コンパイルおよび再配布を禁じます。"
+            legal_3: "3. 本プログラムの無断修正、変更、デバッグ、逆コンパイルおよび再配布を禁じます。",
+            title_faq: "FAQ · よくある質問",
+            faq_html: `<p style="margin-bottom:6px;"><b>Q. AWS/ASME と ISO 基準の入熱量計算式はどう異なりますか？</b><br>AWS/ASME は kJ/in（係数60、mm換算可）、ISO（EN 1011-1）はプロセス別熱効率係数(k)を用いた kJ/mm で計算します。</p>
+<p style="margin-bottom:6px;"><b>Q. WPS・溶接士プリセット（.txt / PDF）はどう登録しますか？</b><br>Free は .txt 各10件まで、PRO は最大300件保存と PDF 自動抽出・編集に対応しています。</p>
+<p style="margin-bottom:6px;"><b>Q. ヘルメットのQR/バーコード読取に専用スキャナーは必要ですか？</b><br>いいえ。スマホのカメラで直接読み取れ、PRO で一括ラベル印刷も可能です。</p>
+<p style="margin:0;"><b>Q. 記録（CSV）や日報（Excel・PDF）はどう出力しますか？</b><br>履歴タブから CSV を無料出力でき、PRO では日次検査報告書（.xlsx / .pdf）を自動生成します。</p>`
         }
     },
 
@@ -312,8 +337,24 @@ const HelpManual = {
         if (titleEl) titleEl.innerText = d.modal_title;
         if (!bodyEl) return;
 
+        const brandMeta = {
+            ko: { app: "용접 입열량 계산기 (Heat-Input Calculator v2.7)", tip: "상단 앱 로고 아이콘을 클릭하면 페이지 최상단으로 이동하며 2초간 로고를 크게 확인할 수 있습니다." },
+            en: { app: "Heat-Input Calculator v2.7", tip: "Tap the top app logo icon to scroll to the top and preview the enlarged logo for 2 seconds." },
+            es: { app: "Calculadora de Aporte Térmico v2.7", tip: "Toque el logotipo superior para volver arriba y ver el icono ampliado durante 2 segundos." },
+            zh: { app: "焊接热输入计算器 v2.7", tip: "点击顶部应用图标可快速返回顶部，并放大预览图标 2 秒。" },
+            ja: { app: "溶接 入熱量 計算機 v2.7", tip: "上部のアプリアイコンをクリックすると最上部へ移動し、ロゴを2秒間拡大表示します。" }
+        }[lang] || { app: "용접 입열량 계산기 (Heat-Input Calculator v2.7)", tip: "상단 앱 로고 아이콘을 클릭하면 페이지 최상단으로 이동하며 2초간 로고를 크게 확인할 수 있습니다." };
+
         bodyEl.innerHTML = `
             <div class="manual-wrap">
+                <div style="display:flex; align-items:center; gap:12px; background:var(--bg-soft); border:1px solid var(--border-light); border-radius:10px; padding:10px 12px; margin-bottom:10px;">
+                    <img src="hi-logo.png" alt="ISKorea Solutions" style="width:42px; height:42px; border-radius:9px; object-fit:contain; flex-shrink:0; background:#fff; border:1px solid var(--border-light);" />
+                    <div style="min-width:0;">
+                        <div style="font-size:13px; font-weight:900; color:var(--text-primary);">${brandMeta.app}</div>
+                        <div style="font-size:11.5px; font-weight:800; color:var(--brand-orange); margin-bottom:2px;">ISKorea Solutions</div>
+                        <div style="font-size:11px; color:var(--text-muted); line-height:1.4;">${brandMeta.tip}</div>
+                    </div>
+                </div>
                 <!-- 1. 규격 및 계산 공식 (기본 열림) -->
                 <details class="manual-accordion" open>
                     <summary class="manual-summary">${d.title_1}</summary>
@@ -434,6 +475,12 @@ const HelpManual = {
                             ${d.btn_open_shortcut}
                         </button>
                     </div>
+                </details>
+
+                <!-- FAQ -->
+                <details class="manual-accordion">
+                    <summary class="manual-summary">${d.title_faq}</summary>
+                    <div class="manual-content">${d.faq_html}</div>
                 </details>
 
                 <!-- 8. 법적 고지 -->
