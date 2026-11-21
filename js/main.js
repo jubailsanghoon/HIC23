@@ -396,6 +396,44 @@ const MainController = (() => {
         this._currentModalType = 'shortcut';
         title.innerText = this.t('shortcut_modal_title');
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+        const lang = (typeof DataStore !== 'undefined' && DataStore.currentLang) ? DataStore.currentLang : (localStorage.getItem('HI_LANG') || 'ko');
+        const pcTxt = {
+            ko: {
+                title: '🖥️ PC 바탕화면 바로가기 생성',
+                desc: '아래 버튼을 클릭하면 윈도우 바탕화면 표준 바로가기 파일(<code>.url</code>)이 다운로드됩니다. 다운로드된 파일을 바탕화면으로 옮겨두시면 언제든 더블 클릭으로 <strong>기본 브라우저</strong>에서 즉시 실행됩니다.',
+                btnUrl: '🖥️ 바탕화면 바로가기 다운로드 (.url)',
+                btnHtml: '🌐 HTML 실행기 (.html)'
+            },
+            en: {
+                title: '🖥️ Create PC Desktop Shortcut',
+                desc: 'Click below to download a standard desktop shortcut file (<code>.url</code>). Move it to your desktop to launch anytime in your <strong>default browser</strong>.',
+                btnUrl: '🖥️ Download Desktop Shortcut (.url)',
+                btnHtml: '🌐 HTML Launcher (.html)'
+            },
+            es: {
+                title: '🖥️ Crear acceso directo en PC',
+                desc: 'Haga clic abajo para descargar un archivo de acceso directo estándar (<code>.url</code>). Muévalo al escritorio para abrirlo con un doble clic en su <strong>navegador predeterminado</strong>.',
+                btnUrl: '🖥️ Descargar acceso directo (.url)',
+                btnHtml: '🌐 Lanzador HTML (.html)'
+            },
+            zh: {
+                title: '🖥️ 创建电脑桌面快捷方式',
+                desc: '点击下方按钮下载标准桌面快捷方式文件 (<code>.url</code>)。将其移至桌面，随时双击即可用<strong>默认浏览器</strong>立即启动。',
+                btnUrl: '🖥️ 下载桌面快捷方式 (.url)',
+                btnHtml: '🌐 HTML 启动器 (.html)'
+            },
+            ja: {
+                title: '🖥️ PCデスクトップショートカット作成',
+                desc: '下のボタンをクリックすると標準ショートカットファイル(<code>.url</code>)がダウンロードされます。デスクトップに保存すればいつでも<strong>既定のブラウザ</strong>で即座に起動できます。',
+                btnUrl: '🖥️ ショートカットをダウンロード (.url)',
+                btnHtml: '🌐 HTMLランチャー (.html)'
+            }
+        }[lang] || {
+            title: '🖥️ Create PC Desktop Shortcut',
+            desc: 'Click below to download a standard desktop shortcut file (<code>.url</code>). Move it to your desktop to launch anytime in your <strong>default browser</strong>.',
+            btnUrl: '🖥️ Download Desktop Shortcut (.url)',
+            btnHtml: '🌐 HTML Launcher (.html)'
+        };
 
         body.innerHTML = `
             <!-- 배너 버튼 -->
@@ -410,18 +448,18 @@ const MainController = (() => {
             <!-- PC 전용 바탕화면 바로가기 원클릭 생성 카드 -->
             <div style="background:#e7f5ff; border:1.5px solid #339af0; border-radius:10px; padding:14px 16px; margin-bottom:14px; color:#1864ab;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <span style="font-size:13.5px; font-weight:900; color:#1864ab;">🖥️ PC 바탕화면 바로가기 생성</span>
+                    <span style="font-size:13.5px; font-weight:900; color:#1864ab;">${pcTxt.title}</span>
                     <span style="font-size:11px; background:#1c7ed6; color:#fff; padding:2px 8px; border-radius:6px; font-weight:800;">Windows / Mac</span>
                 </div>
                 <p style="font-size:12px; margin:0 0 10px 0; line-height:1.5; color:#1971c2;">
-                    아래 버튼을 클릭하면 윈도우 바탕화면 표준 바로가기 파일(<code>.url</code>)이 다운로드됩니다. 다운로드된 파일을 바탕화면으로 옮겨두시면 언제든 더블 클릭으로 <strong>기본 브라우저</strong>에서 즉시 실행됩니다.
+                    ${pcTxt.desc}
                 </p>
                 <div style="display:flex; gap:8px;">
                     <button type="button" onclick="MainController.downloadPcShortcut('url')" style="flex:1; padding:11px 12px; background:#1c7ed6; color:#fff; border:none; border-radius:8px; font-size:13px; font-weight:900; cursor:pointer; box-shadow:0 2px 6px rgba(28,126,214,0.35);">
-                        🖥️ 바탕화면 바로가기 다운로드 (.url)
+                        ${pcTxt.btnUrl}
                     </button>
                     <button type="button" onclick="MainController.downloadPcShortcut('html')" style="padding:11px 12px; background:#fff; color:#1c7ed6; border:1.5px solid #1c7ed6; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">
-                        🌐 HTML 실행기 (.html)
+                        ${pcTxt.btnHtml}
                     </button>
                 </div>
             </div>
