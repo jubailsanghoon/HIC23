@@ -435,7 +435,7 @@
                 <span data-i18n="btn_recent_log">최근 이력</span> (<span id="logCount">0</span>)
             </button>
             <button type="button" id="btnHistoryEditMode" class="hist-sub-btn" onclick="MainController.toggleHistoryEditMode()">
-                <span id="lblHistoryEditMode">✏️ 편집</span>
+                <span id="lblHistoryEditMode" data-i18n="btn_edit_mode">✏️ 편집</span>
             </button>
             <button type="button" class="hist-sub-btn btn-orange pro-feature-btn" onclick="MainController.openDailyReportModal()">
                 <span data-i18n="btn_daily_report">📊 일일보고서</span>
@@ -466,7 +466,7 @@
                         </tr>
                     </thead>
                     <tbody id="historyTableBody">
-                        <tr><td colspan="16" class="empty-msg">저장된 이력이 없습니다.</td></tr>
+                        <tr><td colspan="16" class="empty-msg" data-i18n="msg_empty_log">저장된 이력이 없습니다.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -518,11 +518,11 @@
       });
     </script>
 
-    <script src="js/data_store.js?v=2.7.42" defer></script>
-    <script src="js/help_manual.js?v=2.7.42" defer></script>
-    <script src="js/calculator.js?v=2.7.42" defer></script>
-    <script src="pages/dashboard.js?v=2.7.42" defer></script>
-    <script src="js/main.js?v=2.7.42" defer></script>
+    <script src="js/data_store.js?v=2.7.43" defer></script>
+    <script src="js/help_manual.js?v=2.7.43" defer></script>
+    <script src="js/calculator.js?v=2.7.43" defer></script>
+    <script src="pages/dashboard.js?v=2.7.43" defer></script>
+    <script src="js/main.js?v=2.7.43" defer></script>
 <script>
 if (!sessionStorage.getItem('iskHit_heat')) {
   sessionStorage.setItem('iskHit_heat', '1');

@@ -941,6 +941,12 @@ const MainController = (() => {
                 PresetManager.openViewer(PresetManager.currentImportType || 'wps');
             } else if (this._currentModalType === 'preset_edit' && typeof PresetManager !== 'undefined') {
                 PresetManager.openEditor(PresetManager.currentImportType || 'wps', PresetManager.tempEditingData);
+            } else if (this._currentModalType === 'daily_report') {
+                this.openDailyReportModal();
+            } else if (this._currentModalType === 'scanner') {
+                this.openScannerModal();
+            } else if (this._currentModalType === 'label') {
+                this.openLabelPrintModal();
             }
         }
     },
@@ -1361,9 +1367,9 @@ const MainController = (() => {
                     </td>
                     <td>
                         <div style="display:flex; align-items:center; justify-content:center; gap:3px;">
-                            <button type="button" title="위로" style="background:var(--bg-soft); border:none; border-radius:4px; width:22px; height:22px; font-size:10px; color:var(--text-primary); ${isFirst ? 'opacity:0.35; cursor:default;' : 'cursor:pointer;'}" onclick="MainController.moveHistoryEditRow(${idx}, -1)" ${isFirst ? 'disabled' : ''}>▲</button>
-                            <button type="button" title="아래로" style="background:var(--bg-soft); border:none; border-radius:4px; width:22px; height:22px; font-size:10px; color:var(--text-primary); ${isLast ? 'opacity:0.35; cursor:default;' : 'cursor:pointer;'}" onclick="MainController.moveHistoryEditRow(${idx}, 1)" ${isLast ? 'disabled' : ''}>▼</button>
-                            <button type="button" title="행 삭제" style="background:#fee2e2; border:none; border-radius:4px; width:22px; height:22px; color:#dc2626; font-size:12px; font-weight:900; cursor:pointer;" onclick="MainController.removeHistoryEditRow(${idx})">✕</button>
+                            <button type="button" title="${this.escapeHtmlAttr(this.t('tip_move_up'))}" style="background:var(--bg-soft); border:none; border-radius:4px; width:22px; height:22px; font-size:10px; color:var(--text-primary); ${isFirst ? 'opacity:0.35; cursor:default;' : 'cursor:pointer;'}" onclick="MainController.moveHistoryEditRow(${idx}, -1)" ${isFirst ? 'disabled' : ''}>▲</button>
+                            <button type="button" title="${this.escapeHtmlAttr(this.t('tip_move_down'))}" style="background:var(--bg-soft); border:none; border-radius:4px; width:22px; height:22px; font-size:10px; color:var(--text-primary); ${isLast ? 'opacity:0.35; cursor:default;' : 'cursor:pointer;'}" onclick="MainController.moveHistoryEditRow(${idx}, 1)" ${isLast ? 'disabled' : ''}>▼</button>
+                            <button type="button" title="${this.escapeHtmlAttr(this.t('tip_del_row'))}" style="background:#fee2e2; border:none; border-radius:4px; width:22px; height:22px; color:#dc2626; font-size:12px; font-weight:900; cursor:pointer;" onclick="MainController.removeHistoryEditRow(${idx})">✕</button>
                         </div>
                     </td>
                 </tr>
@@ -1393,8 +1399,13 @@ const MainController = (() => {
         if (list.length === 0) { alert(this.t('alert_no_csv_data')); return; }
         const welderMap = this.buildWelderLookupMap();
         const presets = (typeof DataStore !== 'undefined' && DataStore.getWpsPresets) ? DataStore.getWpsPresets() : [];
-        const headers = ['날짜','시간','규격','용접공정','WPS번호','용접패스','용접사번호','이름','소속부서','조인트번호','V','A','L','T','입열량','판정'];
         const csvEsc = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+        const headers = [
+            this.t('th_date'), this.t('th_time'), this.t('lbl_standard'), this.t('lbl_process'),
+            this.t('lbl_wps_no'), this.t('lbl_weld_pass'), this.t('lbl_welder_id'), this.t('th_name'),
+            this.t('lbl_dept'), this.t('lbl_joint_no'), 'V', 'A', 'L', 'T',
+            this.t('lbl_realtime_res'), this.t('th_judgment')
+        ].map(csvEsc);
         const rows = list.map(r => [r.date, r.time, r.std, r.process, csvEsc(r.wpsNo), csvEsc(r.pass), csvEsc(r.welderId), csvEsc(this.resolveRecordWelderName(r, welderMap)), csvEsc(r.dept), csvEsc(r.jointNo), r.V, r.A, r.L, r.T, r.result, this.resolveRecordJudgment(r, presets)].join(','));
         const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -2525,6 +2536,268 @@ const MainController = (() => {
         await Promise.all(promises);
     },
 
+    _getScannerI18n: function(lang) {
+        const dict = {
+            ko: {
+                title: '📷 용접사 헬멧 스캐너 - QR · 바코드 · 문자(OCR) (PRO)',
+                sub: 'QR/바코드 및 일반 이름표·번호 스티커의 문자를 읽어 [용접사 정보]에 자동 입력합니다. (프리셋 {cur}/{max}명)',
+                guideHead: '💡 아래 3가지 스캔 버튼 및 갤럭시 텍스트 스캔 사용 안내',
+                guide1: '① <b>[📷 카메라 촬영 (좌측 주황 박스)]</b>: 카메라 앱을 바로 실행해 <b>QR 코드 또는 일반 스티커</b>를 사진 찍어 통합 판독합니다.',
+                guide2: '② <b>[🔤 스티커 사진 선택 (가운데 파란 박스)]</b>: 휴대폰 갤러리(앨범)나 폴더에 저장된 <b>일반 스티커 사진·이미지 파일</b>을 불러와 한글·영문·사번 문자(OCR)를 정밀 추출합니다.',
+                guide3: '③ <b>[🎥 실시간 카메라 (우측 검정 박스)]</b>: 실시간 연속 스캔 화면을 수동으로 켭니다. (또는 하단 입력창에서 삼성키보드 <b>[📷 텍스트 스캔]</b> 사용)',
+                btnCam: '📷 카메라 촬영', btnCamSub: '(QR+스티커 바로찍기)',
+                btnOcr: '🔤 스티커 사진선택', btnOcrSub: '(앨범·파일 문자추출)',
+                btnLive: '🎥 실시간 카메라', btnLiveSub: '(수동으로 켜기)',
+                btnLiveStop: '⏹️ 카메라 끄기', btnLiveStopSub: '(실시간 스캔중)',
+                frameHint: '이 사각틀 안에 스티커(이름·사번)를 맞춰주세요',
+                torch: '🔦 조명',
+                captureBtn: '📸 지금 화면에서 문자(OCR) 바로 읽기',
+                quickTitle: '📱 갤럭시 [텍스트 스캔] · 클립보드 · 빠른 검색',
+                btnGalaxy: '📱 갤럭시 텍스트 스캔',
+                btnPaste: '📋 복사글자 붙여넣기',
+                phRaw: '여기를 1초간 길게 눌러 [📷 텍스트 스캔] 선택 또는 이름/번호 입력 (예: 홍보, YU-WQT-203)',
+                btnAutoFill: '자동입력',
+                statusImgSaved: '✅ 스캔 이미지가 기기(갤러리/다운로드)에 <b>{file}</b> 으로 저장되었습니다!',
+                errSaveImg: '이미지 저장 중 오류가 발생했습니다.',
+                statusAnalyzing: '⏳ 사진에서 QR/바코드 및 문자(OCR)를 분석 중입니다...',
+                errNoBarcodeOrText: '❌ 사진에서 QR/바코드나 스티커 글자를 찾지 못했습니다. 스티커를 가까이에서 밝게 다시 촬영해 주세요.',
+                errImgLoad: '❌ 이미지를 불러오지 못했습니다.',
+                statusOcrReading: '⏳ 스티커 사진에서 한글·영문·숫자(OCR)를 정밀 판독 중입니다...',
+                errNoStickerText: '❌ 스티커에서 글자를 읽지 못했습니다. 글자가 흔들리지 않게 가까이에서 다시 촬영해 주세요.',
+                errNoLiveCam: '⚠️ 현재 환경에서는 실시간 카메라 스트림이 제한됩니다. 좌측 <b>[📷 카메라 촬영]</b> 또는 <b>[🔤 스티커 사진선택]</b>을 사용해 주세요.',
+                statusLiveScanning: '📷 실시간 스캔 중... QR/바코드는 자동 인식되며, 일반 스티커는 화면 하단 [📸 지금 화면에서 문자 바로 읽기]를 누르세요.',
+                errCamDenied: '⚠️ 카메라 권한이 거부되었거나 사용할 수 없습니다. 좌측 <b>[📷 카메라 촬영]</b> 버튼을 사용해 주세요.',
+                warnTurnOnCam: '⚠️ 먼저 [🎥 실시간 카메라]를 켜주세요.',
+                statusBurstOcr: '📸 가장 선명한 프레임을 포착하여 판독 중입니다...',
+                errLiveOcrFail: '⚠️ 현재 화면에서 글자를 읽지 못했습니다. 주황색 점선 사각틀 안에 스티커를 맞추고 다시 눌러주세요.'
+            },
+            en: {
+                title: '📷 Welder Helmet Scanner - QR · Barcode · OCR (PRO)',
+                sub: 'Reads QR/barcodes or name/ID sticker text and auto-fills [Welder Info]. (Presets {cur}/{max})',
+                guideHead: '💡 Scan Options & Text Scan Guide',
+                guide1: '① <b>[📷 Take Photo (Orange)]</b>: Opens camera to capture and decode <b>QR/Barcode or sticker text</b>.',
+                guide2: '② <b>[🔤 Pick Sticker Photo (Blue)]</b>: Selects an <b>image from gallery/folder</b> to extract name and welder ID via OCR.',
+                guide3: '③ <b>[🎥 Live Camera (Black)]</b>: Starts continuous live scanning (or long-press the input box below for keyboard <b>[📷 Text Scan]</b>).',
+                btnCam: '📷 Take Photo', btnCamSub: '(QR + Sticker)',
+                btnOcr: '🔤 Pick Photo', btnOcrSub: '(Gallery OCR)',
+                btnLive: '🎥 Live Camera', btnLiveSub: '(Manual Start)',
+                btnLiveStop: '⏹️ Stop Camera', btnLiveStopSub: '(Live Scanning)',
+                frameHint: 'Align sticker (Name / Welder ID) inside this box',
+                torch: '🔦 Light',
+                captureBtn: '📸 Read Text (OCR) Now',
+                quickTitle: '📱 Text Scan · Clipboard · Quick Search',
+                btnGalaxy: '📱 Text Scan',
+                btnPaste: '📋 Paste',
+                phRaw: 'Long-press here for [Text Scan] or type Name / ID (e.g. YU-WQT-203)',
+                btnAutoFill: 'Auto-Fill',
+                statusImgSaved: '✅ Scanned image saved as <b>{file}</b>!',
+                errSaveImg: 'Failed to save image.',
+                statusAnalyzing: '⏳ Analyzing QR/Barcode and OCR text from photo...',
+                errNoBarcodeOrText: '❌ Could not detect QR/barcode or sticker text. Please retake closer in good lighting.',
+                errImgLoad: '❌ Failed to load image.',
+                statusOcrReading: '⏳ Extracting text (OCR) from sticker photo...',
+                errNoStickerText: '❌ Could not read text from sticker. Please hold steady and retake closer.',
+                errNoLiveCam: '⚠️ Live camera stream is unavailable here. Please use <b>[📷 Take Photo]</b> or <b>[🔤 Pick Photo]</b>.',
+                statusLiveScanning: '📷 Live scanning... QR/Barcodes auto-detect; for text stickers tap [📸 Read Text (OCR) Now].',
+                errCamDenied: '⚠️ Camera permission denied or unavailable. Please use <b>[📷 Take Photo]</b>.',
+                warnTurnOnCam: '⚠️ Please turn on [🎥 Live Camera] first.',
+                statusBurstOcr: '📸 Capturing sharpest frame for OCR...',
+                errLiveOcrFail: '⚠️ Could not read text. Align the sticker inside the orange box and tap again.'
+            },
+            zh: {
+                title: '📷 焊工安全帽扫描仪 - QR · 条形码 · 文字识别(OCR) (PRO)',
+                sub: '读取二维码/条形码或铭牌贴纸文字并自动填入[焊工信息]。（预设 {cur}/{max}人）',
+                guideHead: '💡 3种扫描方式及文本扫描说明',
+                guide1: '① <b>[📷 相机拍照 (橙色)]</b>：直接打开相机拍摄<b>二维码或贴纸</b>进行综合识别。',
+                guide2: '② <b>[🔤 选择贴纸照片 (蓝色)]</b>：从相册或文件夹选择<b>贴纸照片</b>，高精度提取文字与工号(OCR)。',
+                guide3: '③ <b>[🎥 实时相机 (黑色)]</b>：手动开启实时连续扫描（也可长按下方输入框使用输入法<b>[📷 扫描文本]</b>）。',
+                btnCam: '📷 相机拍照', btnCamSub: '(QR+贴纸直拍)',
+                btnOcr: '🔤 选择贴纸照片', btnOcrSub: '(相册文字提取)',
+                btnLive: '🎥 实时相机', btnLiveSub: '(手动开启)',
+                btnLiveStop: '⏹️ 关闭相机', btnLiveStopSub: '(实时扫描中)',
+                frameHint: '请将贴纸（姓名/工号）对准此框内',
+                torch: '🔦 照明',
+                captureBtn: '📸 立即识别当前画面文字(OCR)',
+                quickTitle: '📱 文本扫描 · 剪贴板 · 快速搜索',
+                btnGalaxy: '📱 文本扫描',
+                btnPaste: '📋 粘贴文本',
+                phRaw: '长按此处1秒选择[文本扫描]或输入姓名/工号（例：YU-WQT-203）',
+                btnAutoFill: '自动填入',
+                statusImgSaved: '✅ 扫描图像已保存为 <b>{file}</b>！',
+                errSaveImg: '保存图像时出错。',
+                statusAnalyzing: '⏳ 正在分析照片中的二维码/条形码及文字(OCR)...',
+                errNoBarcodeOrText: '❌ 未在照片中识别到二维码/条形码或贴纸文字，请在光线充足处靠近重拍。',
+                errImgLoad: '❌ 无法加载图像。',
+                statusOcrReading: '⏳ 正在高精度识别贴纸照片中的文字(OCR)...',
+                errNoStickerText: '❌ 未能读取贴纸文字，请保持稳定并靠近重拍。',
+                errNoLiveCam: '⚠️ 当前环境不支持实时相机流，请使用<b>[📷 相机拍照]</b>或<b>[🔤 选择贴纸照片]</b>。',
+                statusLiveScanning: '📷 实时扫描中... 二维码/条形码将自动识别；普通贴纸请点击下方[📸 立即识别当前画面文字]。',
+                errCamDenied: '⚠️ 相机权限被拒绝或不可用，请使用左侧<b>[📷 相机拍照]</b>按钮。',
+                warnTurnOnCam: '⚠️ 请先开启[🎥 实时相机]。',
+                statusBurstOcr: '📸 正在捕捉最清晰画面并识别...',
+                errLiveOcrFail: '⚠️ 未能识别当前画面文字，请将贴纸对准橙色虚线框后重试。'
+            },
+            ja: {
+                title: '📷 溶接士ヘルメットスキャナー - QR · バーコード · 文字(OCR) (PRO)',
+                sub: 'QR/バーコードやステッカーの文字を読み取り、[溶接士情報]に自動入力します。（プリセット {cur}/{max}名）',
+                guideHead: '💡 3種類のスキャン方法とテキストスキャン案内',
+                guide1: '① <b>[📷 カメラ撮影 (オレンジ)]</b>：カメラを起動して<b>QRコードやステッカー</b>を撮影・統合判読します。',
+                guide2: '② <b>[🔤 ステッカー写真選択 (青)]</b>：ギャラリーやフォルダの<b>ステッカー画像</b>から氏名・ID(OCR)を高精度抽出します。',
+                guide3: '③ <b>[🎥 リアルタイムカメラ (黒)]</b>：連続スキャンを手動で開始します（下の入力欄長押しで<b>[📷 テキストスキャン]</b>も使用可）。',
+                btnCam: '📷 カメラ撮影', btnCamSub: '(QR+ステッカー)',
+                btnOcr: '🔤 写真を選択', btnOcrSub: '(アルバムOCR)',
+                btnLive: '🎥 ライブカメラ', btnLiveSub: '(手動で開始)',
+                btnLiveStop: '⏹️ カメラ停止', btnLiveStopSub: '(スキャン中)',
+                frameHint: 'この枠内にステッカー（氏名・ID）を合わせてください',
+                torch: '🔦 ライト',
+                captureBtn: '📸 この画面の文字(OCR)を今すぐ読む',
+                quickTitle: '📱 テキストスキャン · クリップボード · クイック検索',
+                btnGalaxy: '📱 テキストスキャン',
+                btnPaste: '📋 貼り付け',
+                phRaw: 'ここを長押しして[テキストスキャン]または氏名/IDを入力（例：YU-WQT-203）',
+                btnAutoFill: '自動入力',
+                statusImgSaved: '✅ スキャン画像を <b>{file}</b> として保存しました！',
+                errSaveImg: '画像の保存中にエラーが発生しました。',
+                statusAnalyzing: '⏳ 写真からQR/バーコードと文字(OCR)を解析中です...',
+                errNoBarcodeOrText: '❌ QR/バーコードやステッカーの文字を検出できませんでした。明るい場所で近づけて再撮影してください。',
+                errImgLoad: '❌ 画像を読み込めませんでした。',
+                statusOcrReading: '⏳ ステッカー写真から文字(OCR)を高精度判読中です...',
+                errNoStickerText: '❌ ステッカーの文字を読み取れませんでした。ブレないよう近づけて再撮影してください。',
+                errNoLiveCam: '⚠️ この環境ではライブカメラが制限されています。<b>[📷 カメラ撮影]</b>または<b>[🔤 写真を選択]</b>をご利用ください。',
+                statusLiveScanning: '📷 ライブスキャン中... QR/バーコードは自動認識、ステッカーは下の[📸 この画面の文字を今すぐ読む]を押してください。',
+                errCamDenied: '⚠️ カメラ権限が拒否されたか利用できません。左の<b>[📷 カメラ撮影]</b>をご利用ください。',
+                warnTurnOnCam: '⚠️ 先に[🎥 ライブカメラ]をオンにしてください。',
+                statusBurstOcr: '📸 最も鮮明なフレームを取得して判読中です...',
+                errLiveOcrFail: '⚠️ 文字を読み取れませんでした。オレンジ色の点線枠にステッカーを合わせて再度押してください。'
+            },
+            es: {
+                title: '📷 Escáner de Casco - QR · Código de Barras · OCR (PRO)',
+                sub: 'Lee códigos QR/barras o texto de etiquetas y autocompleta [Datos del Soldador]. (Preajustes {cur}/{max})',
+                guideHead: '💡 Guía de 3 modos de escaneo',
+                guide1: '① <b>[📷 Tomar Foto (Naranja)]</b>: Abre la cámara para capturar y leer <b>QR/barras o texto de etiqueta</b>.',
+                guide2: '② <b>[🔤 Elegir Foto (Azul)]</b>: Selecciona una <b>imagen de la galería</b> para extraer nombre e ID por OCR.',
+                guide3: '③ <b>[🎥 Cámara en Vivo (Negro)]</b>: Inicia el escaneo continuo (o mantén pulsado el campo inferior para <b>[📷 Escanear texto]</b>).',
+                btnCam: '📷 Tomar Foto', btnCamSub: '(QR + Etiqueta)',
+                btnOcr: '🔤 Elegir Foto', btnOcrSub: '(OCR Galería)',
+                btnLive: '🎥 Cámara en Vivo', btnLiveSub: '(Inicio manual)',
+                btnLiveStop: '⏹️ Detener Cámara', btnLiveStopSub: '(Escaneando)',
+                frameHint: 'Alinee la etiqueta (Nombre / ID) dentro del recuadro',
+                torch: '🔦 Luz',
+                captureBtn: '📸 Leer Texto (OCR) Ahora',
+                quickTitle: '📱 Escanear Texto · Portapapeles · Búsqueda Rápida',
+                btnGalaxy: '📱 Escanear Texto',
+                btnPaste: '📋 Pegar',
+                phRaw: 'Mantenga pulsado aquí para [Escanear texto] o escriba Nombre / ID (ej. YU-WQT-203)',
+                btnAutoFill: 'Autocompletar',
+                statusImgSaved: '✅ ¡Imagen escaneada guardada como <b>{file}</b>!',
+                errSaveImg: 'Error al guardar la imagen.',
+                statusAnalyzing: '⏳ Analizando QR/código de barras y texto OCR de la foto...',
+                errNoBarcodeOrText: '❌ No se detectó QR/barras ni texto. Tome otra foto más cerca y con buena luz.',
+                errImgLoad: '❌ No se pudo cargar la imagen.',
+                statusOcrReading: '⏳ Extrayendo texto (OCR) de la foto de la etiqueta...',
+                errNoStickerText: '❌ No se pudo leer texto de la etiqueta. Mantenga firme y acérquese más.',
+                errNoLiveCam: '⚠️ La cámara en vivo no está disponible aquí. Use <b>[📷 Tomar Foto]</b> o <b>[🔤 Elegir Foto]</b>.',
+                statusLiveScanning: '📷 Escaneando en vivo... QR/barras se detectan automáticamente; para etiquetas pulse [📸 Leer Texto (OCR) Ahora].',
+                errCamDenied: '⚠️ Permiso de cámara denegado o no disponible. Use <b>[📷 Tomar Foto]</b>.',
+                warnTurnOnCam: '⚠️ Encienda primero [🎥 Cámara en Vivo].',
+                statusBurstOcr: '📸 Capturando el cuadro más nítido para OCR...',
+                errLiveOcrFail: '⚠️ No se pudo leer el texto. Alinee la etiqueta dentro del cuadro naranja e intente de nuevo.'
+            }
+        };
+        return dict[lang] || dict.ko;
+    },
+
+    _getLabelI18n: function(lang) {
+        const dict = {
+            ko: {
+                loadingTitle: '⏳ 라벨 생성 모듈을 불러오는 중입니다...',
+                loadingBody: '첫 실행 시에만 모듈 다운로드 시간이 소요될 수 있습니다.',
+                errModule: '라벨 생성 모듈을 불러오는 중 네트워크 오류가 발생했습니다.',
+                title: '🏷️ 헬멧 라벨 일괄 생성 및 인쇄 (PRO)',
+                sub: '현재 저장된 모든 용접사의 부착용 라벨(QR/바코드)을 일괄 생성하여 인쇄합니다. (프리셋 {cur}/{max}명)',
+                info: '💡 현재 프리셋에 저장된 <b>전체 용접사({cur}명)</b>를 대상으로 헬멧 부착용 라벨을 일괄 생성합니다.<br>라벨 하단에는 용접사의 이름, 사번, 소속 정보가 텍스트로 깔끔하게 표시됩니다.',
+                typeLbl: '라벨 코드 형태 선택',
+                optQr: 'QR 코드',
+                optBar: '바코드',
+                optBoth: 'QR + 바코드',
+                btnGen: '전체 용접사 라벨 일괄 생성',
+                btnPrint: '🖨️ 라벨 일괄 인쇄하기 (A4)',
+                alertEmpty: '저장된 용접사 프리셋이 없습니다. 용접사 정보를 먼저 추가해주세요.',
+                errBarcode: '바코드 생성 불가',
+                printTitle: '용접사 라벨 일괄 인쇄'
+            },
+            en: {
+                loadingTitle: '⏳ Loading label generator module...',
+                loadingBody: 'Downloading modules may take a few seconds on first run.',
+                errModule: 'Network error while loading the label generator module.',
+                title: '🏷️ Batch Helmet Label Generator & Print (PRO)',
+                sub: 'Generates and prints QR/barcode helmet labels for all saved welders. (Presets {cur}/{max})',
+                info: '💡 Generates helmet labels for <b>all saved welders ({cur})</b> in presets.<br>Welder name, ID, and department are printed cleanly below the code.',
+                typeLbl: 'Select Label Code Format',
+                optQr: 'QR Code',
+                optBar: 'Barcode',
+                optBoth: 'QR + Barcode',
+                btnGen: 'Generate All Welder Labels',
+                btnPrint: '🖨️ Print All Labels (A4)',
+                alertEmpty: 'No saved welder presets found. Please add welder info first.',
+                errBarcode: 'Barcode Error',
+                printTitle: 'Welder Labels Batch Print'
+            },
+            zh: {
+                loadingTitle: '⏳ 正在加载标签生成模块...',
+                loadingBody: '首次使用时可能需要几秒钟下载模块。',
+                errModule: '加载标签生成模块时发生网络错误。',
+                title: '🏷️ 安全帽标签批量生成与打印 (PRO)',
+                sub: '为当前保存的所有焊工批量生成并打印安全帽标签（二维码/条形码）。（预设 {cur}/{max}人）',
+                info: '💡 将为预设中保存的<b>全部焊工（{cur}人）</b>批量生成安全帽标签。<br>标签下方会清晰显示焊工姓名、工号和部门信息。',
+                typeLbl: '选择标签码类型',
+                optQr: '二维码 (QR)',
+                optBar: '条形码',
+                optBoth: '二维码 + 条形码',
+                btnGen: '批量生成全部焊工标签',
+                btnPrint: '🖨️ 批量打印标签 (A4)',
+                alertEmpty: '没有已保存的焊工预设，请先添加焊工信息。',
+                errBarcode: '无法生成条形码',
+                printTitle: '焊工标签批量打印'
+            },
+            ja: {
+                loadingTitle: '⏳ ラベル生成モジュールを読み込み中です...',
+                loadingBody: '初回実行時のみモジュールのダウンロードに時間がかかる場合があります。',
+                errModule: 'ラベル生成モジュールの読み込み中にネットワークエラーが発生しました。',
+                title: '🏷️ ヘルメットラベル一括生成・印刷 (PRO)',
+                sub: '保存されている全溶接士のヘルメット用ラベル(QR/バーコード)を一括生成・印刷します。（プリセット {cur}/{max}名）',
+                info: '💡 プリセットに保存された<b>全溶接士（{cur}名）</b>のヘルメット用ラベルを一括生成します。<br>ラベル下部には氏名・ID・所属が見やすく表示されます。',
+                typeLbl: 'ラベルコード形式の選択',
+                optQr: 'QRコード',
+                optBar: 'バーコード',
+                optBoth: 'QR + バーコード',
+                btnGen: '全溶接士ラベルを一括生成',
+                btnPrint: '🖨️ ラベルを一括印刷 (A4)',
+                alertEmpty: '保存された溶接士プリセットがありません。先に溶接士情報を追加してください。',
+                errBarcode: 'バーコード生成不可',
+                printTitle: '溶接士ラベル一括印刷'
+            },
+            es: {
+                loadingTitle: '⏳ Cargando módulo generador de etiquetas...',
+                loadingBody: 'La descarga del módulo puede tardar unos segundos la primera vez.',
+                errModule: 'Error de red al cargar el módulo generador de etiquetas.',
+                title: '🏷️ Generación e Impresión de Etiquetas (PRO)',
+                sub: 'Genera e imprime etiquetas QR/código de barras para todos los soldadores guardados. (Preajustes {cur}/{max})',
+                info: '💡 Genera etiquetas para casco de <b>todos los soldadores guardados ({cur})</b>.<br>Debajo del código se muestran nombre, ID y departamento.',
+                typeLbl: 'Seleccionar formato de código',
+                optQr: 'Código QR',
+                optBar: 'Código de barras',
+                optBoth: 'QR + Código de barras',
+                btnGen: 'Generar todas las etiquetas',
+                btnPrint: '🖨️ Imprimir todas las etiquetas (A4)',
+                alertEmpty: 'No hay soldadores guardados en preajustes. Agregue datos primero.',
+                errBarcode: 'Error de código',
+                printTitle: 'Impresión de Etiquetas de Soldadores'
+            }
+        };
+        return dict[lang] || dict.ko;
+    },
+
     // ─────────────────────────────────────────────────────────
     // 1. 스캐너 전용 모달 (QR / 바코드 / 스티커 OCR - Heat_Input_Calculator_Pro_2_3 엔진)
     // ─────────────────────────────────────────────────────────
@@ -2546,38 +2819,41 @@ const MainController = (() => {
         // 모달 오픈과 동시에 백그라운드에서 OCR 워커 사전 초기화
         this.hiGetOcrWorker().catch(() => {});
 
+        const lang = localStorage.getItem('HI_LANG') || 'ko';
+        const si = this._getScannerI18n(lang);
         const maxCount = (typeof PresetManager !== 'undefined' && PresetManager.getMaxCount) ? PresetManager.getMaxCount() : 300;
         const currentWelderCount = DataStore.getWelderPresets().length;
+        const subTxt = si.sub.replace('{cur}', currentWelderCount).replace('{max}', maxCount);
 
         title.innerHTML = `
             <div style="background-color: var(--brand-orange); color: white; padding: 16px; border-radius: 8px 8px 0 0; margin: -20px -20px 16px -20px;">
-                <h3 style="margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">📷 용접사 헬멧 스캐너 - QR · 바코드 · 문자(OCR) (PRO)</h3>
-                <p style="margin: 4px 0 0 0; font-size: 11px; font-weight: normal;">QR/바코드 및 일반 이름표·번호 스티커의 문자를 읽어 [용접사 정보]에 자동 입력합니다. (프리셋 ${currentWelderCount}/${maxCount}명)</p>
+                <h3 style="margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">${si.title}</h3>
+                <p style="margin: 4px 0 0 0; font-size: 11px; font-weight: normal;">${subTxt}</p>
             </div>
         `;
 
         body.innerHTML = `
             <div style="background-color: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: 12px; border-radius: 8px; font-size: 11px; line-height: 1.6; margin-bottom: 14px;">
-                <b style="font-size: 12px;">💡 아래 3가지 스캔 버튼 및 갤럭시 텍스트 스캔 사용 안내</b><br>
-                ① <b>[📷 카메라 촬영 (좌측 주황 박스)]</b>: 카메라 앱을 바로 실행해 <b>QR 코드 또는 일반 스티커</b>를 사진 찍어 통합 판독합니다.<br>
-                ② <b>[🔤 스티커 사진 선택 (가운데 파란 박스)]</b>: 휴대폰 갤러리(앨범)나 폴더에 저장된 <b>일반 스티커 사진·이미지 파일</b>을 불러와 한글·영문·사번 문자(OCR)를 정밀 추출합니다.<br>
-                ③ <b>[🎥 실시간 카메라 (우측 검정 박스)]</b>: 실시간 연속 스캔 화면을 수동으로 켭니다. (또는 하단 입력창에서 삼성키보드 <b>[📷 텍스트 스캔]</b> 사용)
+                <b style="font-size: 12px;">${si.guideHead}</b><br>
+                ${si.guide1}<br>
+                ${si.guide2}<br>
+                ${si.guide3}
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px;">
                 <label style="background: var(--brand-orange); color: white; text-align: center; padding: 12px 4px; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer; border: 2px solid #ea580c; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.4;">
-                    <span style="font-size: 13px; margin-bottom: 2px;">📷 카메라 촬영</span>
-                    <span style="font-size: 10px; opacity: 0.9;">(QR+스티커 바로찍기)</span>
+                    <span style="font-size: 13px; margin-bottom: 2px;">${si.btnCam}</span>
+                    <span style="font-size: 10px; opacity: 0.9;">${si.btnCamSub}</span>
                     <input type="file" accept="image/*" capture="environment" style="display:none" onchange="MainController.handleBarcodeImageUpload(event)">
                 </label>
                 <label style="background: #2563eb; color: white; text-align: center; padding: 12px 4px; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer; border: 2px solid #1d4ed8; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.4;">
-                    <span style="font-size: 13px; margin-bottom: 2px;">🔤 스티커 사진선택</span>
-                    <span style="font-size: 10px; opacity: 0.9;">(앨범·파일 문자추출)</span>
+                    <span style="font-size: 13px; margin-bottom: 2px;">${si.btnOcr}</span>
+                    <span style="font-size: 10px; opacity: 0.9;">${si.btnOcrSub}</span>
                     <input type="file" accept="image/*" style="display:none" onchange="MainController.handleStickerOcrUpload(event)">
                 </label>
                 <button type="button" id="btnToggleCam" style="background: #111827; color: white; border: 2px solid #000; text-align: center; padding: 12px 4px; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.4;" onclick="MainController.startLiveCamera()">
-                    <span style="font-size: 13px; margin-bottom: 2px;">🎥 실시간 카메라</span>
-                    <span style="font-size: 10px; opacity: 0.85;">(수동으로 켜기)</span>
+                    <span style="font-size: 13px; margin-bottom: 2px;">${si.btnLive}</span>
+                    <span style="font-size: 10px; opacity: 0.85;">${si.btnLiveSub}</span>
                 </button>
             </div>
 
@@ -2585,11 +2861,11 @@ const MainController = (() => {
                 <video id="scanVideoEl" playsinline muted style="width:100%; height:240px; object-fit:cover; display:block;"></video>
                 <div style="position:absolute; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center;">
                     <div style="width:78%; height:52%; border:2.5px dashed #ff6d00; border-radius:10px; box-shadow:0 0 0 9999px rgba(0,0,0,0.38); display:flex; align-items:flex-end; justify-content:center; padding-bottom:4px;">
-                        <span style="background:rgba(0,0,0,0.65); color:#fff; font-size:10px; font-weight:800; padding:2px 8px; border-radius:4px;">이 사각틀 안에 스티커(이름·사번)를 맞춰주세요</span>
+                        <span style="background:rgba(0,0,0,0.65); color:#fff; font-size:10px; font-weight:800; padding:2px 8px; border-radius:4px;">${si.frameHint}</span>
                     </div>
                 </div>
-                <button type="button" id="btnTorchToggle" onclick="MainController.toggleCameraTorch()" style="display:none; position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.7); color:#fbbf24; border:1.5px solid #fbbf24; border-radius:6px; padding:5px 9px; font-size:11px; font-weight:900; cursor:pointer;">🔦 조명</button>
-                <button type="button" onclick="MainController.captureLiveStickerOcr()" style="position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:#ff6d00; color:#fff; border:2px solid #fff; border-radius:999px; padding:8px 18px; font-size:12px; font-weight:900; box-shadow:0 4px 12px rgba(0,0,0,0.4); cursor:pointer; white-space:nowrap;">📸 지금 화면에서 문자(OCR) 바로 읽기</button>
+                <button type="button" id="btnTorchToggle" onclick="MainController.toggleCameraTorch()" style="display:none; position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.7); color:#fbbf24; border:1.5px solid #fbbf24; border-radius:6px; padding:5px 9px; font-size:11px; font-weight:900; cursor:pointer;">${si.torch}</button>
+                <button type="button" onclick="MainController.captureLiveStickerOcr()" style="position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:#ff6d00; color:#fff; border:2px solid #fff; border-radius:999px; padding:8px 18px; font-size:12px; font-weight:900; box-shadow:0 4px 12px rgba(0,0,0,0.4); cursor:pointer; white-space:nowrap;">${si.captureBtn}</button>
             </div>
 
             <div id="readerBox" style="width: 100%; margin-bottom: 12px; border-radius: 8px; overflow: hidden; display: none;"></div>
@@ -2599,16 +2875,16 @@ const MainController = (() => {
 
             <div style="border: 2px solid var(--border-strong); border-radius: 8px; padding: 12px; background: var(--bg-card);">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom: 8px;">
-                    <span style="font-size: 11px; font-weight: 900; color: var(--text-primary);">📱 갤럭시 [텍스트 스캔] · 클립보드 · 빠른 검색</span>
+                    <span style="font-size: 11px; font-weight: 900; color: var(--text-primary);">${si.quickTitle}</span>
                     <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                        <button type="button" onclick="MainController.focusGalaxyTextScan()" style="background: var(--brand-orange); color: white; font-size: 10px; font-weight: 900; padding: 3px 7px; border-radius: 5px; border: 1.5px solid #000; cursor: pointer;">📱 갤럭시 텍스트 스캔</button>
-                        <button type="button" onclick="MainController.pasteClipboardToScanner()" style="background: #2563eb; color: white; font-size: 10px; font-weight: 900; padding: 3px 7px; border-radius: 5px; border: 1.5px solid #000; cursor: pointer;">📋 복사글자 붙여넣기</button>
+                        <button type="button" onclick="MainController.focusGalaxyTextScan()" style="background: var(--brand-orange); color: white; font-size: 10px; font-weight: 900; padding: 3px 7px; border-radius: 5px; border: 1.5px solid #000; cursor: pointer;">${si.btnGalaxy}</button>
+                        <button type="button" onclick="MainController.pasteClipboardToScanner()" style="background: #2563eb; color: white; font-size: 10px; font-weight: 900; padding: 3px 7px; border-radius: 5px; border: 1.5px solid #000; cursor: pointer;">${si.btnPaste}</button>
                         <button type="button" id="btnNfcScan" onclick="MainController.startNfcScan()" style="background: #059669; color: white; font-size: 10px; font-weight: 900; padding: 3px 7px; border-radius: 5px; border: 1.5px solid #000; cursor: pointer;">📡 NFC</button>
                     </div>
                 </div>
                 <div style="display: flex; gap: 8px;">
-                    <input type="text" id="scanRawText" style="flex: 1; padding: 9px 10px; border: 1.5px solid var(--border-strong); border-radius: 6px; font-size: 13px; font-weight: 800; background: var(--bg-main); color: var(--text-primary);" placeholder="여기를 1초간 길게 눌러 [📷 텍스트 스캔] 선택 또는 이름/번호 입력 (예: 홍보, YU-WQT-203)" oninput="MainController.filterQuickWelderSearch(this.value)" onkeydown="if(event.key==='Enter'){MainController.applyRawText();}">
-                    <button type="button" style="background: #000; color: white; font-weight: 900; font-size: 13px; border: none; border-radius: 6px; padding: 0 14px; cursor: pointer; white-space: nowrap;" onclick="MainController.applyRawText()">자동입력</button>
+                    <input type="text" id="scanRawText" style="flex: 1; padding: 9px 10px; border: 1.5px solid var(--border-strong); border-radius: 6px; font-size: 13px; font-weight: 800; background: var(--bg-main); color: var(--text-primary);" placeholder="${this.escapeHtmlAttr(si.phRaw)}" oninput="MainController.filterQuickWelderSearch(this.value)" onkeydown="if(event.key==='Enter'){MainController.applyRawText();}">
+                    <button type="button" style="background: #000; color: white; font-weight: 900; font-size: 13px; border: none; border-radius: 6px; padding: 0 14px; cursor: pointer; white-space: nowrap;" onclick="MainController.applyRawText()">${si.btnAutoFill}</button>
                 </div>
                 <div id="scanQuickSearch" style="display:flex; flex-wrap:wrap; gap:5px; max-height:110px; overflow-y:auto; margin-top:8px;"></div>
             </div>
@@ -2639,15 +2915,17 @@ const MainController = (() => {
         const body = document.getElementById('subPageBody');
         if (!modal || !body) return;
 
+        const lang = localStorage.getItem('HI_LANG') || 'ko';
+        const li = this._getLabelI18n(lang);
         this._currentModalType = 'label';
-        title.innerHTML = `<h3 style="margin: 0; font-size: 16px;">⏳ 라벨 생성 모듈을 불러오는 중입니다...</h3>`;
-        body.innerHTML = `<div style="padding:40px; text-align:center; color:var(--text-muted);">첫 실행 시에만 모듈 다운로드 시간이 소요될 수 있습니다.</div>`;
+        title.innerHTML = `<h3 style="margin: 0; font-size: 16px;">${li.loadingTitle}</h3>`;
+        body.innerHTML = `<div style="padding:40px; text-align:center; color:var(--text-muted);">${li.loadingBody}</div>`;
         modal.classList.remove('hidden');
 
         try {
             await this.loadScannerLibraries('label');
         } catch(e) {
-            alert("라벨 생성 모듈을 불러오는 중 네트워크 오류가 발생했습니다.");
+            alert(li.errModule);
             this.closeModal();
             return;
         }
@@ -2657,39 +2935,38 @@ const MainController = (() => {
 
         title.innerHTML = `
             <div style="background-color: #10b981; color: white; padding: 16px; border-radius: 8px 8px 0 0; margin: -20px -20px 16px -20px;">
-                <h3 style="margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">🏷️ 헬멧 라벨 일괄 생성 및 인쇄 (PRO)</h3>
-                <p style="margin: 4px 0 0 0; font-size: 11px; font-weight: normal;">현재 저장된 모든 용접사의 부착용 라벨(QR/바코드)을 일괄 생성하여 인쇄합니다. (프리셋 ${currentWelderCount}/${maxCount}명)</p>
+                <h3 style="margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">${li.title}</h3>
+                <p style="margin: 4px 0 0 0; font-size: 11px; font-weight: normal;">${li.sub.replace('{cur}', currentWelderCount).replace('{max}', maxCount)}</p>
             </div>
         `;
 
         body.innerHTML = `
             <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 12px; border-radius: 8px; font-size: 11px; line-height: 1.6; margin-bottom: 16px;">
-                💡 현재 프리셋에 저장된 <b>전체 용접사(${currentWelderCount}명)</b>를 대상으로 헬멧 부착용 라벨을 일괄 생성합니다.<br>
-                라벨 하단에는 용접사의 이름, 사번, 소속 정보가 텍스트로 깔끔하게 표시됩니다.
+                ${li.info.replace('{cur}', currentWelderCount)}
             </div>
             
             <div style="margin-bottom: 16px;">
-                <label style="font-size:12px; font-weight:800; color:var(--text-primary); display:block; margin-bottom:8px;">라벨 코드 형태 선택</label>
+                <label style="font-size:12px; font-weight:800; color:var(--text-primary); display:block; margin-bottom:8px;">${li.typeLbl}</label>
                 <div style="display: flex; gap: 10px;">
                     <label style="flex:1; background:var(--bg-card); border:2px solid var(--border-light); padding:10px; border-radius:8px; text-align:center; cursor:pointer; font-size:13px; font-weight:800;">
-                        <input type="radio" name="lblType" value="qr" checked style="margin-bottom:4px;"> <br>QR 코드
+                        <input type="radio" name="lblType" value="qr" checked style="margin-bottom:4px;"> <br>${li.optQr}
                     </label>
                     <label style="flex:1; background:var(--bg-card); border:2px solid var(--border-light); padding:10px; border-radius:8px; text-align:center; cursor:pointer; font-size:13px; font-weight:800;">
-                        <input type="radio" name="lblType" value="barcode" style="margin-bottom:4px;"> <br>바코드
+                        <input type="radio" name="lblType" value="barcode" style="margin-bottom:4px;"> <br>${li.optBar}
                     </label>
                     <label style="flex:1; background:var(--bg-card); border:2px solid var(--border-light); padding:10px; border-radius:8px; text-align:center; cursor:pointer; font-size:13px; font-weight:800;">
-                        <input type="radio" name="lblType" value="both" style="margin-bottom:4px;"> <br>QR + 바코드
+                        <input type="radio" name="lblType" value="both" style="margin-bottom:4px;"> <br>${li.optBoth}
                     </label>
                 </div>
             </div>
 
-            <button type="button" class="act-btn btn-black" style="width:100%; margin-bottom:16px;" onclick="MainController.generateLabelPreview()">전체 용접사 라벨 일괄 생성</button>
+            <button type="button" class="act-btn btn-black" style="width:100%; margin-bottom:16px;" onclick="MainController.generateLabelPreview()">${li.btnGen}</button>
             
             <div id="labelPreviewArea" style="display:none; border: 2px dashed var(--border-strong); padding: 16px; border-radius: 8px; background: #fafafa; max-height: 380px; overflow-y: auto;">
                 <div id="printTarget" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; background: #fff; padding: 16px; color: #000;">
                 </div>
                 <div style="margin-top: 20px;">
-                    <button type="button" class="act-btn" style="display:inline-flex; width: 100%; background: var(--brand-orange); color: white; border: none;" onclick="MainController.printLabel()">🖨️ 라벨 일괄 인쇄하기 (A4)</button>
+                    <button type="button" class="act-btn" style="display:inline-flex; width: 100%; background: var(--brand-orange); color: white; border: none;" onclick="MainController.printLabel()">${li.btnPrint}</button>
                 </div>
             </div>
             <button type="button" style="width: 100%; padding: 12px; background: #000; color: #fff; font-weight: 800; font-size: 14px; border: none; border-radius: 8px; margin-top: 16px; cursor: pointer;" onclick="MainController.closeScanModal()">${this.t('btn_close_x')}</button>
@@ -2698,9 +2975,11 @@ const MainController = (() => {
 
     // 전체 용접사 대상 라벨 일괄 생성 로직 (QR 한글 인코딩 무결성 및 API Fallback 적용)
     generateLabelPreview: function() {
+        const lang = localStorage.getItem('HI_LANG') || 'ko';
+        const li = this._getLabelI18n(lang);
         const welders = DataStore.getWelderPresets();
         if (!welders || welders.length === 0) {
-            alert("저장된 용접사 프리셋이 없습니다. 용접사 정보를 먼저 추가해주세요.");
+            alert(li.alertEmpty);
             return;
         }
 
@@ -2795,19 +3074,21 @@ const MainController = (() => {
                         });
                     }
                 } catch (err) {
-                    document.getElementById(barId).outerHTML = `<div style="font-size:10px;color:red;">바코드 생성 불가</div>`;
+                    document.getElementById(barId).outerHTML = `<div style="font-size:10px;color:red;">${li.errBarcode}</div>`;
                 }
             }
         });
     },
 
     printLabel: function() {
+        const lang = localStorage.getItem('HI_LANG') || 'ko';
+        const li = this._getLabelI18n(lang);
         const printContent = document.getElementById('printTarget').outerHTML;
         const win = window.open('', '', 'width=800,height=600');
         win.document.write(`
             <html>
             <head>
-                <title>용접사 라벨 일괄 인쇄</title>
+                <title>${li.printTitle}</title>
                 <style>
                     body { margin: 0; padding: 20px; background: #fff; }
                     #printTarget { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
@@ -4064,12 +4345,14 @@ const MainController = (() => {
             a.click();
             document.body.removeChild(a);
 
+            const si = this._getScannerI18n(localStorage.getItem('HI_LANG') || 'ko');
             const statusEl = document.getElementById('ocrStatus');
             if (statusEl) {
-                statusEl.innerHTML = `<span style="color:#16a34a;">✅ 스캔 이미지가 기기(갤러리/다운로드)에 <b>${filename}</b> 으로 저장되었습니다!</span>`;
+                statusEl.innerHTML = `<span style="color:#16a34a;">${si.statusImgSaved.replace('{file}', filename)}</span>`;
             }
         } catch (e) {
-            alert('이미지 저장 중 오류가 발생했습니다.');
+            const si = this._getScannerI18n(localStorage.getItem('HI_LANG') || 'ko');
+            alert(si.errSaveImg);
         }
     },
 
@@ -4083,10 +4366,11 @@ const MainController = (() => {
     handleBarcodeImageUpload: async function(event) {
         const file = event && event.target && event.target.files ? event.target.files[0] : null;
         if (!file) return;
+        const si = this._getScannerI18n(localStorage.getItem('HI_LANG') || 'ko');
         this.hideSaveScanImageBar();
         await this.cacheScannedImage(null, file);
         const statusEl = document.getElementById('ocrStatus');
-        if (statusEl) statusEl.innerText = "⏳ 사진에서 QR/바코드 및 문자(OCR)를 분석 중입니다...";
+        if (statusEl) statusEl.innerText = si.statusAnalyzing;
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = async () => {
@@ -4113,7 +4397,7 @@ const MainController = (() => {
                     this.processScannedText(ocrText);
                 } else {
                     if (statusEl) {
-                        statusEl.innerHTML = `<span style="color:#dc2626;">❌ 사진에서 QR/바코드나 스티커 글자를 찾지 못했습니다. 스티커를 가까이에서 밝게 다시 촬영해 주세요.</span>`;
+                        statusEl.innerHTML = `<span style="color:#dc2626;">${si.errNoBarcodeOrText}</span>`;
                     }
                     this.renderSaveScanImageBar();
                 }
@@ -4124,7 +4408,7 @@ const MainController = (() => {
         };
         img.onerror = () => {
             URL.revokeObjectURL(url);
-            if (statusEl) statusEl.innerText = "❌ 이미지를 불러오지 못했습니다.";
+            if (statusEl) statusEl.innerText = si.errImgLoad;
             this.renderSaveScanImageBar();
             event.target.value = "";
         };
@@ -4134,10 +4418,11 @@ const MainController = (() => {
     handleStickerOcrUpload: async function(event) {
         const file = event && event.target && event.target.files ? event.target.files[0] : null;
         if (!file) return;
+        const si = this._getScannerI18n(localStorage.getItem('HI_LANG') || 'ko');
         this.hideSaveScanImageBar();
         await this.cacheScannedImage(null, file);
         const statusEl = document.getElementById('ocrStatus');
-        if (statusEl) statusEl.innerText = "⏳ 스티커 사진에서 한글·영문·숫자(OCR)를 정밀 판독 중입니다...";
+        if (statusEl) statusEl.innerText = si.statusOcrReading;
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = async () => {
@@ -4164,7 +4449,7 @@ const MainController = (() => {
                     this.processScannedText(cleanCode, { isBarcode: true });
                 } else {
                     if (statusEl) {
-                        statusEl.innerHTML = `<span style="color:#dc2626;">❌ 스티커에서 글자를 읽지 못했습니다. 글자가 흔들리지 않게 가까이에서 다시 촬영해 주세요.</span>`;
+                        statusEl.innerHTML = `<span style="color:#dc2626;">${si.errNoStickerText}</span>`;
                     }
                     this.renderSaveScanImageBar();
                 }
@@ -4175,7 +4460,7 @@ const MainController = (() => {
         };
         img.onerror = () => {
             URL.revokeObjectURL(url);
-            if (statusEl) statusEl.innerText = "❌ 이미지를 불러오지 못했습니다.";
+            if (statusEl) statusEl.innerText = si.errImgLoad;
             this.renderSaveScanImageBar();
             event.target.value = "";
         };
@@ -4190,6 +4475,7 @@ const MainController = (() => {
             this.stopLiveCamera();
             return;
         }
+        const si = this._getScannerI18n(localStorage.getItem('HI_LANG') || 'ko');
         const wrap = document.getElementById('scanVideoWrap');
         const video = document.getElementById('scanVideoEl');
         const statusEl = document.getElementById('ocrStatus');
@@ -4197,7 +4483,7 @@ const MainController = (() => {
         if (!wrap || !video) return;
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            if (statusEl) statusEl.innerHTML = `<span style="color:#dc2626;">⚠️ 현재 환경에서는 실시간 카메라 스트림이 제한됩니다. 좌측 <b>[📷 카메라 촬영]</b> 또는 <b>[🔤 스티커 사진선택]</b>을 사용해 주세요.</span>`;
+            if (statusEl) statusEl.innerHTML = `<span style="color:#dc2626;">${si.errNoLiveCam}</span>`;
             return;
         }
 
@@ -4212,7 +4498,7 @@ const MainController = (() => {
             await video.play();
             wrap.style.display = 'block';
             if (btnCam) {
-                btnCam.innerHTML = `<span style="font-size: 13px; margin-bottom: 2px;">⏹️ 카메라 끄기</span><span style="font-size: 10px; opacity: 0.85;">(실시간 스캔중)</span>`;
+                btnCam.innerHTML = `<span style="font-size: 13px; margin-bottom: 2px;">${si.btnLiveStop}</span><span style="font-size: 10px; opacity: 0.85;">${si.btnLiveStopSub}</span>`;
                 btnCam.style.background = '#dc2626';
             }
 
@@ -4227,7 +4513,7 @@ const MainController = (() => {
             } catch (e) {}
 
             if (statusEl) {
-                statusEl.innerText = "📷 실시간 스캔 중... QR/바코드는 자동 인식되며, 일반 스티커는 화면 하단 [📸 지금 화면에서 문자 바로 읽기]를 누르세요.";
+                statusEl.innerText = si.statusLiveScanning;
             }
 
             let busy = false;
@@ -4249,7 +4535,7 @@ const MainController = (() => {
             }, 350);
         } catch (err) {
             if (statusEl) {
-                statusEl.innerHTML = `<span style="color:#dc2626;">⚠️ 카메라 권한이 거부되었거나 사용할 수 없습니다. 좌측 <b>[📷 카메라 촬영]</b> 버튼을 사용해 주세요.</span>`;
+                statusEl.innerHTML = `<span style="color:#dc2626;">${si.errCamDenied}</span>`;
             }
         }
     },
@@ -4301,14 +4587,15 @@ const MainController = (() => {
     },
 
     captureLiveStickerOcr: async function() {
+        const si = this._getScannerI18n(localStorage.getItem('HI_LANG') || 'ko');
         const video = document.getElementById('scanVideoEl');
         const statusEl = document.getElementById('ocrStatus');
         if (!video || !this._scanStream || video.readyState < 2) {
-            if (statusEl) statusEl.innerText = "⚠️ 먼저 [🎥 실시간 카메라]를 켜주세요.";
+            if (statusEl) statusEl.innerText = si.warnTurnOnCam;
             return;
         }
         this.hideSaveScanImageBar();
-        if (statusEl) statusEl.innerText = "📸 가장 선명한 프레임을 포착하여 판독 중입니다...";
+        if (statusEl) statusEl.innerText = si.statusBurstOcr;
         const cropCnv = await this.grabSharpestCrop(video);
         await this.cacheScannedImage(video, null);
         const code = await this.decodeBarcodeFromSource(cropCnv) || await this.decodeBarcodeFromSource(video);
@@ -4333,13 +4620,14 @@ const MainController = (() => {
             this.processScannedText(ocrText);
         } else {
             if (statusEl) {
-                statusEl.innerHTML = `<span style="color:#dc2626;">⚠️ 현재 화면에서 글자를 읽지 못했습니다. 주황색 점선 사각틀 안에 스티커를 맞추고 다시 눌러주세요.</span>`;
+                statusEl.innerHTML = `<span style="color:#dc2626;">${si.errLiveOcrFail}</span>`;
             }
             this.renderSaveScanImageBar();
         }
     },
 
     stopLiveCamera: async function() {
+        const si = this._getScannerI18n(localStorage.getItem('HI_LANG') || 'ko');
         if (this._scanTimer) {
             clearInterval(this._scanTimer);
             this._scanTimer = null;
@@ -4353,7 +4641,7 @@ const MainController = (() => {
         if (wrap) wrap.style.display = 'none';
         const btnCam = document.getElementById('btnToggleCam');
         if (btnCam) {
-            btnCam.innerHTML = `<span style="font-size: 13px; margin-bottom: 2px;">🎥 실시간 카메라</span><span style="font-size: 10px; opacity: 0.85;">(수동으로 켜기)</span>`;
+            btnCam.innerHTML = `<span style="font-size: 13px; margin-bottom: 2px;">${si.btnLive}</span><span style="font-size: 10px; opacity: 0.85;">${si.btnLiveSub}</span>`;
             btnCam.style.background = '#111827';
         }
         if (window.html5QrcodeScanner) {
